@@ -1,1 +1,1161 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Percussão Corporal - Sequenciador Iniciante</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👏</text></svg>">
+    
+    <!-- Bibliotecas Three.js e OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --left-color: #4db6ac; 
+            --left-color-dark: #00796b;
+            --right-color: #ff8a65; 
+            --right-color-dark: #d84315;
+            --text-main: #2c3e50;
+            --ui-bg: #ffffff;
+            --ui-border: #cfd9e0;
+            --active-glow: rgba(255, 215, 0, 0.6);
+            --cell-size: 32px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        /* --- PALCO 3D (CIMA) --- */
+        #stage-container {
+            flex: 1 1 45vh;
+            min-height: 35vh;
+            position: relative;
+            background-color: #1e272e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: inset 0 -5px 15px rgba(0,0,0,0.3);
+        }
+
+        #canvas3d {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #canvas3d:active { cursor: grabbing; }
+
+        #hint {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255,255,255,0.9);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #333;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        /* Painel do Glossário Flutuante */
+        #glossary-panel {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid var(--ui-border);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            width: 180px;
+        }
+        #glossary-panel.show { display: flex; }
+        .glossary-btn {
+            padding: 8px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        .glossary-btn:hover { background: #eee; }
+
+        /* --- ÁREA PRINCIPAL (MEIO) --- */
+        #main-workspace {
+            display: flex;
+            flex: 1 1 auto;
+            height: auto;
+            min-height: 200px;
+            background: var(--ui-bg);
+            border-top: 2px solid var(--ui-border);
+            border-bottom: 2px solid var(--ui-border);
+        }
+
+        /* Biblioteca Esquerda */
+        #library {
+            width: 280px;
+            min-width: 280px;
+            border-right: 2px solid var(--ui-border);
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .library-title { font-size: 0.9em; font-weight: bold; text-transform: uppercase; color: #888; text-align: center; }
+        .step-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        .step-btn {
+            padding: 10px 5px;
+            border: 1px solid var(--ui-border);
+            border-radius: 6px;
+            background: white;
+            cursor: grab;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .step-btn:active { cursor: grabbing; }
+
+        .step-btn.left { color: var(--left-color-dark); border-left: 5px solid var(--left-color); }
+        .step-btn.left:hover, .step-btn.left.selected { background-color: rgba(77, 182, 172, 0.15); border-color: var(--left-color); }
+
+        .step-btn.right { color: var(--right-color-dark); border-left: 5px solid var(--right-color); }
+        .step-btn.right:hover, .step-btn.right.selected { background-color: rgba(255, 138, 101, 0.15); border-color: var(--right-color); }
+
+        .step-btn.pos { color: #b08d00; border-left: 5px solid #ffd54f; }
+        .step-btn.pos:hover, .step-btn.pos.selected { background-color: rgba(255, 213, 79, 0.15); border-color: #ffd54f; }
+
+        .step-btn.selected { box-shadow: 0 0 5px rgba(0,0,0,0.2); transform: scale(0.95); }
+
+        /* Timeline Direita */
+        #timeline-wrapper {
+            flex: 1;
+            padding: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            background: #fdfdfd;
+        }
+
+        .timeline-header, .timeline-row {
+            display: grid;
+            grid-template-columns: 45px repeat(32, var(--cell-size));
+            gap: 3px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .timeline-header { font-size: 0.7em; color: #888; text-align: center; margin-bottom: 12px; }
+        
+        .beat-marker { grid-column: span 4; border-left: 2px solid #ccc; padding-left: 4px; text-align: left; font-weight: bold; }
+
+        .row-label { font-weight: bold; font-size: 0.95em; text-align: right; padding-right: 12px; }
+        .row-label.left { color: var(--left-color-dark); }
+        .row-label.right { color: var(--right-color-dark); }
+        .row-label.pos { color: #d4ac0d; font-size: 0.85em; }
+
+        .time-cell {
+            width: var(--cell-size);
+            height: 40px;
+            background: #f4f6f8;
+            border: 1px solid #d1d8df;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.65em;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+        .time-cell:nth-child(4n + 2) { border-left-width: 3px; border-left-color: #a0acb8; }
+
+        .time-cell.active-left { background-color: var(--left-color); color: white; border-color: var(--left-color-dark); }
+        .time-cell.active-right { background-color: var(--right-color); color: white; border-color: var(--right-color-dark); }
+        .time-cell.active-pos { background-color: #ffd54f; color: #333; border-color: #f39c12; }
+
+        .time-cell.playing { box-shadow: 0 0 10px var(--active-glow); transform: scale(1.1); z-index: 10; border-color: gold; }
+
+        /* Playhead visual */
+        #playhead {
+            position: absolute;
+            top: 20px; bottom: 10px; width: 3px;
+            background-color: rgba(255, 0, 0, 0.6);
+            pointer-events: none; transition: left 0.1s linear;
+            left: 65px; z-index: 5;
+            box-shadow: 0 0 5px rgba(255,0,0,0.5);
+        }
+
+        /* --- CONTROLES (BAIXO) --- */
+        #controls {
+            padding: 15px 20px; background: var(--ui-bg); display: flex;
+            align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;
+        }
+        .control-group { display: flex; align-items: center; gap: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 6px; background: #eee; color: #333; font-weight: bold; cursor: pointer; }
+        button:hover { background: #ddd; }
+
+        .upload-btn { padding: 8px 12px; border: none; border-radius: 6px; background: #9b59b6; color: white; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 0.85em; display: flex; align-items: center; justify-content: center; }
+        .upload-btn:hover { background: #8e44ad; }
+        #audio-upload { display: none; }
+        
+        #play-btn { background: #27ae60; color: white; font-size: 1.1em; padding: 10px 24px; }
+        #play-btn.playing { background: #e74c3c; }
+        input[type="range"] { width: 100px; }
+        .bpm-display { min-width: 60px; font-variant-numeric: tabular-nums; }
+
+        /* Modal */
+        #modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        #modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-list { list-style: none; margin-bottom: 15px; max-height: 250px; overflow-y: auto;}
+        .modal-list li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .modal-list li:hover { background: #f9f9f9; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 768px) {
+            #main-workspace { flex-direction: column; }
+            #library { width: 100%; min-width: 100%; border-right: none; border-bottom: 2px solid var(--ui-border); max-height: 200px; }
+            .step-group { display: flex; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; gap: 8px; }
+            .step-btn { flex: 0 0 75px; }
+            #stage-container { flex: 0 0 35vh; min-height: 35vh; }
+            .timeline-header, .timeline-row { grid-template-columns: 40px repeat(32, 35px); }
+            :root { --cell-size: 35px; }
+            #playhead { left: 60px; }
+            #hint { display: none; }
+            #controls { justify-content: center; }
+            .control-group { flex-wrap: wrap; justify-content: center; }
+            #glossary-panel { max-height: 80vh; overflow-y: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. PALCO 3D -->
+    <div id="stage-container">
+        <div id="hint">🖱️ <b>Câmera 3D:</b> Clique e arraste para girar. Role para Zoom.</div>
+        
+        <!-- GLOSSÁRIO FLUTUANTE -->
+        <div id="glossary-panel">
+            <div style="font-size:0.85em; color:#666; font-weight:bold; text-align:center; margin-bottom: 5px;">SONS (VOZES)</div>
+            <button class="glossary-btn" onclick="previewGlossaryStep('Pé')">Pé (Grave) <span>🔊</span></button>
+            <button class="glossary-btn" onclick="previewGlossaryStep('Coxa')">Coxa (Médio) <span>🔊</span></button>
+            <button class="glossary-btn" onclick="previewGlossaryStep('Peito')">Peito (Tumba) <span>🔊</span></button>
+            <button class="glossary-btn" onclick="previewGlossaryStep('Palma')">Palma (Agudo) <span>🔊</span></button>
+            <button class="glossary-btn" onclick="previewGlossaryStep('Estalo')">Estalo (Seco) <span>🔊</span></button>
+            <button onclick="toggleGlossary()" style="margin-top:5px; background:#ddd; padding:5px;">Fechar</button>
+        </div>
+
+        <div id="canvas3d"></div>
+    </div>
+
+    <!-- 2 e 3. BIBLIOTECA E TIMELINE -->
+    <div id="main-workspace">
+        <div id="library">
+            <div class="library-title">Lado Esquerdo</div>
+            <div class="step-group">
+                <div class="step-btn left" draggable="true" data-foot="L" data-type="Pé">🦶 Pé</div>
+                <div class="step-btn left" draggable="true" data-foot="L" data-type="Coxa">🦵 Coxa</div>
+                <div class="step-btn left" draggable="true" data-foot="L" data-type="Peito">🫁 Peito</div>
+                <div class="step-btn left" draggable="true" data-foot="L" data-type="Palma">👏 Palma</div>
+                <div class="step-btn left" draggable="true" data-foot="L" data-type="Estalo">🫰 Estalo</div>
+            </div>
+            <div class="library-title" style="margin-top: 10px;">Lado Direito</div>
+            <div class="step-group">
+                <div class="step-btn right" draggable="true" data-foot="R" data-type="Pé">🦶 Pé</div>
+                <div class="step-btn right" draggable="true" data-foot="R" data-type="Coxa">🦵 Coxa</div>
+                <div class="step-btn right" draggable="true" data-foot="R" data-type="Peito">🫁 Peito</div>
+                <div class="step-btn right" draggable="true" data-foot="R" data-type="Palma">👏 Palma</div>
+                <div class="step-btn right" draggable="true" data-foot="R" data-type="Estalo">🫰 Estalo</div>
+            </div>
+            <div class="library-title" style="margin-top: 15px;">Giro do Corpo</div>
+            <div class="step-group">
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Frente">⬆️ Frente</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Esq">⬅️ Esq</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Dir">➡️ Dir</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Trás">⬇️ Trás</div>
+            </div>
+        </div>
+
+        <div id="timeline-wrapper">
+            <div id="playhead"></div>
+            <div class="timeline-header" id="tl-header"><div></div></div>
+            <div class="timeline-row" id="row-pos"><div class="row-label pos">GIRO</div></div>
+            <div class="timeline-row" id="row-left"><div class="row-label left">ESQ</div></div>
+            <div class="timeline-row" id="row-right"><div class="row-label right">DIR</div></div>
+        </div>
+    </div>
+
+    <!-- 4. CONTROLES -->
+    <div id="controls">
+        <div class="control-group">
+            <button id="play-btn">▶ Play</button>
+            <button id="clear-btn" title="Limpar Tudo">🗑️ Limpar</button>
+        </div>
+        
+        <div class="control-group">
+            <label>BPM:</label>
+            <input type="range" id="bpm-slider" min="40" max="180" value="100">
+            <span id="bpm-display" class="bpm-display">100</span>
+            <label style="margin-left: 10px;">Velocidade:</label>
+            <select id="speed-select">
+                <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
+            <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
+        </div>
+
+        <div class="control-group">
+            <button id="bgm-toggle" style="background: #27ae60; color:white; padding: 8px 12px; font-size: 0.85em;" title="Ligar/Desligar Música">🎵 Música</button>
+            <input type="range" id="bgm-volume" min="0" max="1" step="0.05" value="0.3" style="width: 70px;" title="Volume da Música">
+            <label for="audio-upload" class="upload-btn" title="Carregar MP3 do computador">📂 MP3</label>
+            <input type="file" id="audio-upload" accept="audio/*">
+        </div>
+
+        <div class="control-group">
+            <button id="toggle-glossary-btn" style="background: #3498db; color:white;">📖 Ouvir Sons</button>
+            <button id="presets-btn">🎓 Aprender (Ritmos)</button>
+            <button id="save-btn">💾 Salvar</button>
+        </div>
+    </div>
+
+    <!-- Modal Base -->
+    <div id="modal-overlay">
+        <div id="modal-content">
+            <h3 id="modal-title">Título</h3>
+            <ul id="modal-list" class="modal-list"></ul>
+            <div id="save-input-area" style="display:none; margin-bottom: 15px;">
+                <input type="text" id="save-name" placeholder="Nome do padrão rítmico" style="width:100%; padding: 8px;">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-close">Cancelar</button>
+                <button id="modal-confirm" style="background: #27ae60; color:white; display:none;">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * ESTADO E PRESETS
+ */
+const state = {
+    bpm: 100, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true,
+    totalSteps: 32, currentStep: 0,
+    sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null })),
+    selectedTool: null, draggedData: null
+};
+
+let targetBodyRotY = 0;
+
+const presets = {
+    "1. Marcha Básica (Alternada)": [ {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'L', t: 'Pé'}, {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Pé'}, {step: 16, f: 'R', t: 'Pé'}, {step: 20, f: 'L', t: 'Pé'}, {step: 24, f: 'R', t: 'Pé'}, {step: 28, f: 'L', t: 'Pé'} ],
+    "2. Rock Stadium (We Will Rock You)": [ {step: 0, f: 'R', t: 'Pé'}, {step: 1, f: 'L', t: 'Pé'}, {step: 4, f: 'R', t: 'Palma'}, {step: 8, f: 'R', t: 'Pé'}, {step: 9, f: 'L', t: 'Pé'}, {step: 12, f: 'R', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 17, f: 'L', t: 'Pé'}, {step: 20, f: 'R', t: 'Palma'}, {step: 24, f: 'R', t: 'Pé'}, {step: 25, f: 'L', t: 'Pé'}, {step: 28, f: 'R', t: 'Palma'} ],
+    "3. Pop Beat Simples": [ {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'R', t: 'Palma'}, {step: 8, f: 'R', t: 'Pé'}, {step: 10, f: 'L', t: 'Pé'}, {step: 12, f: 'R', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 20, f: 'R', t: 'Palma'}, {step: 24, f: 'R', t: 'Pé'}, {step: 26, f: 'L', t: 'Pé'}, {step: 28, f: 'R', t: 'Palma'} ],
+    "4. Sambinha (Peito e Palma)": [ {step: 0, f: 'R', t: 'Peito'}, {step: 2, f: 'L', t: 'Palma'}, {step: 3, f: 'R', t: 'Peito'}, {step: 4, f: 'L', t: 'Palma'}, {step: 6, f: 'R', t: 'Peito'}, {step: 8, f: 'R', t: 'Peito'}, {step: 10, f: 'L', t: 'Palma'}, {step: 11, f: 'R', t: 'Peito'}, {step: 12, f: 'L', t: 'Palma'}, {step: 14, f: 'R', t: 'Peito'}, {step: 16, f: 'R', t: 'Peito'}, {step: 18, f: 'L', t: 'Palma'}, {step: 19, f: 'R', t: 'Peito'}, {step: 20, f: 'L', t: 'Palma'}, {step: 22, f: 'R', t: 'Peito'}, {step: 24, f: 'R', t: 'Peito'}, {step: 26, f: 'L', t: 'Palma'}, {step: 27, f: 'R', t: 'Peito'}, {step: 28, f: 'L', t: 'Palma'}, {step: 30, f: 'R', t: 'Peito'} ],
+    "5. Funk Carioca (Tuntz Tacha)": [ {step: 0, f: 'R', t: 'Peito'}, {step: 3, f: 'L', t: 'Estalo'}, {step: 6, f: 'R', t: 'Peito'}, {step: 8, f: 'R', t: 'Peito'}, {step: 11, f: 'L', t: 'Estalo'}, {step: 16, f: 'R', t: 'Peito'}, {step: 19, f: 'L', t: 'Estalo'}, {step: 22, f: 'R', t: 'Peito'}, {step: 24, f: 'R', t: 'Peito'}, {step: 27, f: 'L', t: 'Estalo'} ],
+    "6. Maracatu Básico": [ {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Coxa'}, {step: 3, f: 'R', t: 'Coxa'}, {step: 4, f: 'R', t: 'Pé'}, {step: 6, f: 'L', t: 'Coxa'}, {step: 7, f: 'R', t: 'Coxa'}, {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Coxa'}, {step: 19, f: 'R', t: 'Coxa'}, {step: 20, f: 'R', t: 'Pé'}, {step: 22, f: 'L', t: 'Coxa'}, {step: 23, f: 'R', t: 'Coxa'}, {step: 24, f: 'R', t: 'Pé'}, {step: 28, f: 'L', t: 'Palma'} ],
+    "7. Desafio de Coordenação 1": [ {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Coxa'}, {step: 4, f: 'R', t: 'Peito'}, {step: 6, f: 'L', t: 'Estalo'}, {step: 8, f: 'L', t: 'Pé'}, {step: 10, f: 'R', t: 'Coxa'}, {step: 12, f: 'L', t: 'Peito'}, {step: 14, f: 'R', t: 'Estalo'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Coxa'}, {step: 20, f: 'R', t: 'Peito'}, {step: 22, f: 'L', t: 'Estalo'}, {step: 24, f: 'L', t: 'Pé'}, {step: 26, f: 'R', t: 'Coxa'}, {step: 28, f: 'L', t: 'Peito'}, {step: 30, f: 'R', t: 'Estalo'} ],
+    "8. Giro 4 Cantos": [ {step: 0, f: 'Pos', t: 'Frente'}, {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Palma'}, {step: 4, f: 'L', t: 'Pé'}, {step: 6, f: 'R', t: 'Palma'}, {step: 8, f: 'Pos', t: 'Esq'}, {step: 8, f: 'R', t: 'Pé'}, {step: 10, f: 'L', t: 'Palma'}, {step: 12, f: 'L', t: 'Pé'}, {step: 14, f: 'R', t: 'Palma'}, {step: 16, f: 'Pos', t: 'Trás'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Palma'}, {step: 20, f: 'L', t: 'Pé'}, {step: 22, f: 'R', t: 'Palma'}, {step: 24, f: 'Pos', t: 'Dir'}, {step: 24, f: 'R', t: 'Pé'}, {step: 26, f: 'L', t: 'Palma'}, {step: 28, f: 'L', t: 'Pé'}, {step: 30, f: 'R', t: 'Palma'} ]
+};
+
+// --- ÁUDIO (Web Audio API) ---
+let audioCtx = null;
+let nextNoteTime = 0.0;
+let scheduleAheadTime = 0.1; 
+let lookahead = 25; 
+let timerID;
+
+// Mapa de URLs dos seus arquivos no GitHub (usando raw.githubusercontent.com)
+const audioUrls = {
+    'Pé_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-d.mp3',
+    'Pé_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-e.mp3',
+    'Coxa_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/coxa-d.mp3',
+    'Coxa_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/coxa-e.mp3',
+    'Estalo_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-d.mp3',
+    'Estalo_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-e.mp3',
+    'Palma': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/palmas.mp3',
+    'Peito': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito.mp3'
+};
+
+// Armazena os áudios decodificados
+const audioBuffers = {};
+
+// Música de Fundo Padrão
+let bgMusic = new Audio('https://upload.wikimedia.org/wikipedia/commons/5/5b/Kevin_MacLeod_-_Carefree.ogg');
+bgMusic.loop = true;
+bgMusic.volume = 0.3;
+let bgMusicEnabled = true;
+
+async function loadAudioSample(key, url) {
+    try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+        console.error("Erro ao carregar áudio:", key, e);
+    }
+}
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Carregar todos os seus samples de áudio
+        Object.keys(audioUrls).forEach(key => loadAudioSample(key, audioUrls[key]));
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playPercussionSound(time, side, type) {
+    if (!audioCtx) return;
+
+    const gain = audioCtx.createGain();
+    
+    // Panorâmica para separar esquerda/direita (Palmas ficam no centro)
+    const panNode = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+    if(audioCtx.createStereoPanner) {
+        panNode.pan.value = type === 'Palma' ? 0 : (side === 'L' ? -0.4 : 0.4);
+    }
+
+    gain.connect(panNode); 
+    panNode.connect(audioCtx.destination);
+
+    // Identificar qual sample usar (Palma e Peito usam o mesmo arquivo para L e R)
+    let bufferKey = (type === 'Palma' || type === 'Peito') ? type : `${type}_${side}`;
+    let buffer = audioBuffers[bufferKey];
+
+    if (buffer) {
+        // Tocar o Sample Real
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain);
+        
+        // Ajuste de volume base se precisar igualar os samples
+        let vol = 1.0;
+        if(type === 'Pé') vol = 1.2;
+        if(type === 'Estalo') vol = 0.8;
+        if(type === 'Peito') vol = 1.2; // Aumentar um pouco para dar peso ao peito
+        
+        gain.gain.setValueAtTime(vol, time);
+        source.start(time);
+    }
+}
+
+function playMetronome(time, beatIndex) {
+    if (!audioCtx || !state.metronomeOn) return;
+    if (beatIndex % 4 !== 0) return;
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.value = (beatIndex % 16 === 0) ? 1200 : 800; 
+    gain.gain.setValueAtTime(0.3, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    osc.start(time); osc.stop(time + 0.05);
+}
+
+function nextNote() {
+    const secondsPerStep = (60.0 / (state.bpm * state.speedMultiplier)) / 4; 
+    nextNoteTime += secondsPerStep;
+    state.currentStep++;
+    if (state.currentStep >= state.totalSteps) {
+        if(state.loopOn) state.currentStep = 0;
+        else stopPlayback();
+    }
+}
+
+function scheduleNote(stepNumber, time) {
+    playMetronome(time, stepNumber);
+    const stepData = state.sequence[stepNumber];
+
+    if (stepData.Pos) {
+        switch(stepData.Pos) {
+            case 'Frente': targetBodyRotY = 0; break;
+            case 'Esq': targetBodyRotY = Math.PI / 2; break;
+            case 'Trás': targetBodyRotY = Math.PI; break;
+            case 'Dir': targetBodyRotY = -Math.PI / 2; break;
+        }
+    }
+
+    if (stepData.L) { playPercussionSound(time, 'L', stepData.L); triggerAnimation('L', stepData.L); }
+    if (stepData.R) { playPercussionSound(time, 'R', stepData.R); triggerAnimation('R', stepData.R); }
+
+    setTimeout(() => { updatePlayheadUI(stepNumber); }, Math.max(0, (time - audioCtx.currentTime) * 1000));
+}
+
+function scheduler() {
+    if (!state.isPlaying) return;
+    while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+        scheduleNote(state.currentStep, nextNoteTime);
+        nextNote();
+        if(!state.isPlaying) break; 
+    }
+    timerID = window.setTimeout(scheduler, lookahead);
+}
+
+function togglePlayback() { initAudio(); state.isPlaying ? stopPlayback() : startPlayback(); }
+
+function startPlayback() {
+    state.isPlaying = true; state.currentStep = 0;
+    targetBodyRotY = 0; // Volta para frente ao dar play
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    
+    if (bgMusicEnabled) {
+        bgMusic.currentTime = 0;
+        bgMusic.play().catch(e => console.log("Áudio bloqueado:", e));
+    }
+
+    document.getElementById('play-btn').textContent = '⏹ Stop';
+    document.getElementById('play-btn').classList.add('playing');
+    scheduler();
+}
+
+function stopPlayback() {
+    state.isPlaying = false; window.clearTimeout(timerID);
+    targetBodyRotY = 0; // Volta para frente ao parar
+    
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
+
+    document.getElementById('play-btn').textContent = '▶ Play';
+    document.getElementById('play-btn').classList.remove('playing');
+    document.querySelectorAll('.time-cell').forEach(c => c.classList.remove('playing'));
+    document.getElementById('playhead').style.left = '65px'; 
+    state.currentStep = 0;
+}
+
+// --- INTERFACE (UI) ---
+function initUI() {
+    const header = document.getElementById('tl-header');
+    const rowPos = document.getElementById('row-pos');
+    const rowL = document.getElementById('row-left');
+    const rowR = document.getElementById('row-right');
+
+    for (let i = 0; i < state.totalSteps; i++) {
+        if (i % 4 === 0) {
+            const beatMark = document.createElement('div');
+            beatMark.className = 'beat-marker'; beatMark.textContent = (i/4 + 1);
+            header.appendChild(beatMark);
+        }
+        [ {r: 'Pos', p: rowPos}, {r: 'L', p: rowL}, {r: 'R', p: rowR} ].forEach(cfg => {
+            const cell = document.createElement('div');
+            cell.className = 'time-cell'; cell.dataset.col = i; cell.dataset.row = cfg.r;
+            setupCellEvents(cell); cfg.p.appendChild(cell);
+        });
+    }
+
+    document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('selected'));
+            let isSameTool = false;
+            if (state.selectedTool) {
+                if (btn.dataset.type === 'Pos') {
+                    isSameTool = (state.selectedTool.isPos && state.selectedTool.val === btn.dataset.val);
+                } else {
+                    isSameTool = (!state.selectedTool.isPos && state.selectedTool.type === btn.dataset.type && state.selectedTool.foot === btn.dataset.foot);
+                }
+            }
+            if (isSameTool) { state.selectedTool = null; } 
+            else {
+                btn.classList.add('selected');
+                if (btn.dataset.type === 'Pos') {
+                    state.selectedTool = { isPos: true, val: btn.dataset.val };
+                } else {
+                    state.selectedTool = { isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
+                }
+            }
+        });
+
+        btn.addEventListener('dragstart', (e) => {
+            if (btn.dataset.type === 'Pos') {
+                state.draggedData = { isPos: true, val: btn.dataset.val };
+            } else {
+                state.draggedData = { isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
+            }
+            e.dataTransfer.setData('text/plain', JSON.stringify(state.draggedData));
+            btn.click();
+        });
+    });
+
+    document.getElementById('play-btn').addEventListener('click', togglePlayback);
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        if(confirm("Limpar toda a sequência?")) {
+            state.sequence = Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null }));
+            renderSequenceUI();
+        }
+    });
+
+    const bpmDisplay = document.getElementById('bpm-display');
+    document.getElementById('bpm-slider').addEventListener('input', (e) => { state.bpm = e.target.value; bpmDisplay.textContent = state.bpm; });
+    document.getElementById('speed-select').addEventListener('change', (e) => { 
+        state.speedMultiplier = parseFloat(e.target.value); 
+        bgMusic.playbackRate = state.speedMultiplier;
+    });
+
+    const metroBtn = document.getElementById('metro-btn');
+    metroBtn.addEventListener('click', () => {
+        state.metronomeOn = !state.metronomeOn;
+        metroBtn.textContent = state.metronomeOn ? '🔔 Metrônomo: ON' : '🔕 Metrônomo: OFF';
+        metroBtn.style.background = state.metronomeOn ? '#ddd' : '#f9f9f9';
+    });
+
+    const loopBtn = document.getElementById('loop-btn');
+    loopBtn.addEventListener('click', () => {
+        state.loopOn = !state.loopOn;
+        loopBtn.textContent = state.loopOn ? '🔁 Loop: ON' : '➡️ Loop: OFF';
+        loopBtn.style.background = state.loopOn ? '#27ae60' : '#ddd';
+        loopBtn.style.color = state.loopOn ? 'white' : '#333';
+    });
+
+    const bgmToggle = document.getElementById('bgm-toggle');
+    bgmToggle.addEventListener('click', () => {
+        bgMusicEnabled = !bgMusicEnabled;
+        bgmToggle.style.background = bgMusicEnabled ? '#27ae60' : '#ddd';
+        bgmToggle.style.color = bgMusicEnabled ? 'white' : '#333';
+        if (!bgMusicEnabled && !bgMusic.paused) bgMusic.pause();
+        if (bgMusicEnabled && state.isPlaying) bgMusic.play();
+    });
+
+    const bgmVolume = document.getElementById('bgm-volume');
+    bgmVolume.addEventListener('input', (e) => { bgMusic.volume = e.target.value; });
+
+    const audioUpload = document.getElementById('audio-upload');
+    audioUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            bgMusic.src = url;
+            alert(`Áudio "${file.name}" carregado! Dica: Ajuste o BPM do sequenciador para sincronizar os passos com a sua música.`);
+        }
+    });
+
+    document.getElementById('toggle-glossary-btn').addEventListener('click', toggleGlossary);
+    document.getElementById('presets-btn').addEventListener('click', showPresets);
+    document.getElementById('save-btn').addEventListener('click', showSaveMenu);
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+}
+
+function setupCellEvents(cell) {
+    cell.addEventListener('click', () => {
+        const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
+        if (state.selectedTool) {
+            if (state.selectedTool.isPos && row === 'Pos') {
+                state.sequence[col][row] = state.sequence[col][row] === state.selectedTool.val ? null : state.selectedTool.val;
+                renderSequenceUI();
+            } else if (!state.selectedTool.isPos && (row === 'L' || row === 'R')) {
+                let targetRow = row;
+                if (state.sequence[col][targetRow] === state.selectedTool.type) { 
+                    state.sequence[col][targetRow] = null; 
+                } else {
+                    state.sequence[col][targetRow] = state.selectedTool.type;
+                    initAudio(); 
+                    playPercussionSound(audioCtx.currentTime, targetRow, state.selectedTool.type); 
+                    triggerAnimation(targetRow, state.selectedTool.type);
+                }
+                renderSequenceUI();
+            }
+        } else if (state.sequence[col][row] !== null) {
+            state.sequence[col][row] = null; renderSequenceUI();
+        }
+    });
+
+    cell.addEventListener('dragover', (e) => { e.preventDefault(); });
+    cell.addEventListener('drop', (e) => {
+        e.preventDefault(); const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
+        if (state.draggedData) {
+            if (state.draggedData.isPos && row === 'Pos') {
+                state.sequence[col][row] = state.draggedData.val;
+            } else if (!state.draggedData.isPos && (row === 'L' || row === 'R')) {
+                state.sequence[col][row] = state.draggedData.type;
+            }
+            renderSequenceUI();
+        }
+    });
+}
+
+function renderSequenceUI() {
+    document.querySelectorAll('.time-cell').forEach(cell => {
+        const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
+        const stepType = state.sequence[col][row];
+        cell.className = 'time-cell'; cell.textContent = '';
+        if (stepType) {
+            if (row === 'Pos') {
+                cell.classList.add('active-pos');
+                cell.textContent = stepType.substring(0, 3); // Frn, Esq, Dir, Trá
+            } else {
+                cell.classList.add(row === 'L' ? 'active-left' : 'active-right');
+                // Abreviações para a timeline
+                const abv = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es' };
+                cell.textContent = abv[stepType] || stepType;
+            }
+        }
+    });
+}
+
+function updatePlayheadUI(stepIndex) {
+    document.querySelectorAll('.time-cell.playing').forEach(c => c.classList.remove('playing'));
+    const activeCells = document.querySelectorAll(`.time-cell[data-col="${stepIndex}"]`);
+    activeCells.forEach(c => c.classList.add('playing'));
+    if(activeCells.length > 0) {
+        const wrapper = document.getElementById('timeline-wrapper');
+        const rect = activeCells[0].getBoundingClientRect();
+        const containerRect = wrapper.getBoundingClientRect();
+        document.getElementById('playhead').style.left = `${rect.left - containerRect.left + wrapper.scrollLeft + (rect.width/2)}px`;
+    }
+}
+
+// --- RENDERING 3D (THREE.JS) ---
+let scene, camera, renderer, controls;
+let bodyAvatarGroup;
+const avatarParts = {
+    L: { armPivot: null, legPivot: null, meshes: {} },
+    R: { armPivot: null, legPivot: null, meshes: {} }
+};
+
+function initThreeJS() {
+    const container = document.getElementById('canvas3d');
+    
+    // 1. Configuração Básica da Cena, Neblina e Câmera
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x2a1f1a); // Cor de fundo marrom-escura
+    scene.fog = new THREE.Fog(0x2a1f1a, 100, 400); // Neblina
+
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1000);
+    camera.position.set(100, 100, 150); // Posição inicial da câmera
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true; // Ativa sombras
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 20, 0); // Foca no centro do boneco
+    controls.maxPolarAngle = Math.PI / 2 + 0.05; // Evitar que câmera vá para debaixo do assoalho
+
+    // 2. Configuração das Luzes do Palco
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Luz ambiente suave
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8); // Refletor principal (quente)
+    dirLight.position.set(50, 100, 50);
+    dirLight.castShadow = true; // Ativa sombras
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.DirectionalLight(0xaabbff, 0.3); // Luz de preenchimento (fria)
+    fillLight.position.set(-50, 50, -50);
+    scene.add(fillLight);
+
+    // 3. Criação do Chão e da Grade de Referência
+    const floorGeometry = new THREE.PlaneGeometry(500, 500); // Tamanho do chão
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2e15, roughness: 0.6, metalness: 0.1 }); // Material de madeira marrom
+    const floorPlane = new THREE.Mesh(floorGeometry, floorMaterial);
+    floorPlane.rotation.x = -Math.PI / 2; // Rotaciona para ficar horizontal
+    floorPlane.receiveShadow = true; // Permite que o chão receba sombras
+    scene.add(floorPlane);
+
+    const gridHelper = new THREE.GridHelper(500, 50, 0x000000, 0x000000); // Grade preta de referência
+    gridHelper.material.opacity = 0.15; // Deixa a grade sutil
+    gridHelper.material.transparent = true;
+    gridHelper.position.y = 0.1; // Levanta ligeiramente para não "piscar" com o chão
+    scene.add(gridHelper);
+
+    createBodyAvatar();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    animate3D();
+}
+
+function createBodyAvatar() {
+    bodyAvatarGroup = new THREE.Group();
+    
+    const matSkin = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.5 });
+    const matShirt = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.8 });
+    const matPants = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
+    const matShoes = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+
+    // Helper para configurar as variáveis de brilho e as sombras da malha
+    const setupGlowAndShadow = (mesh) => {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.baseColor = mesh.material.color.clone();
+        mesh.userData.targetScale = 1.0;
+        mesh.userData.isAnimating = false;
+    };
+
+    // Cabeça
+    const head = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 32), matSkin);
+    head.position.set(0, 36, 0); // Ajustado para dar espaço aos ombros
+    head.castShadow = true;
+    bodyAvatarGroup.add(head);
+
+    // Corpo central base (Tronco)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(7, 6, 16, 16), matShirt);
+    torso.position.set(0, 26, 0);
+    torso.castShadow = true;
+    bodyAvatarGroup.add(torso);
+
+    // Peito (L/R)
+    const chestGeo = new THREE.BoxGeometry(6, 8, 8);
+    const chestL = new THREE.Mesh(chestGeo, matShirt.clone());
+    chestL.position.set(-4, 28, 2);
+    setupGlowAndShadow(chestL);
+    bodyAvatarGroup.add(chestL);
+    avatarParts.L.meshes['Peito'] = chestL;
+
+    const chestR = new THREE.Mesh(chestGeo, matShirt.clone());
+    chestR.position.set(4, 28, 2);
+    setupGlowAndShadow(chestR);
+    bodyAvatarGroup.add(chestR);
+    avatarParts.R.meshes['Peito'] = chestR;
+
+    // Geometrias com Pivot Ajustado (Traduzimos a geometria para que o ponto (0,0,0) fique na junta)
+    const armGeo = new THREE.CylinderGeometry(2, 2, 15, 16); // Braço mais longo (antes era 12)
+    armGeo.translate(0, -7.5, 0); // Pivot transferido para o topo (Ombro)
+    const handGeo = new THREE.SphereGeometry(3.5, 16, 16);
+    
+    const thighGeo = new THREE.CylinderGeometry(3.5, 3, 14, 16);
+    thighGeo.translate(0, -7, 0); // Pivot transferido para o topo (Quadril)
+    const footGeo = new THREE.BoxGeometry(4.5, 3, 9);
+
+    ['L', 'R'].forEach(side => {
+        const isLeft = side === 'L';
+        const sign = isLeft ? -1 : 1;
+
+        // --- PIVÔ DO BRAÇO (Ombro) ---
+        const armPivot = new THREE.Group();
+        armPivot.position.set(sign * 9, 33, 0); 
+        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.2); // Braços levemente abertos por padrão
+        armPivot.rotation.copy(armPivot.userData.restingRot);
+        armPivot.userData.isAnimating = false;
+        armPivot.userData.animProgress = 0;
+        
+        const armMesh = new THREE.Mesh(armGeo, matSkin.clone());
+        armMesh.castShadow = true;
+        armPivot.add(armMesh);
+
+        const handMesh = new THREE.Mesh(handGeo, matSkin.clone());
+        handMesh.position.set(0, -15, 0); // Fim do braço atualizado
+        setupGlowAndShadow(handMesh);
+        armPivot.add(handMesh);
+
+        bodyAvatarGroup.add(armPivot);
+        avatarParts[side].armPivot = armPivot;
+        avatarParts[side].meshes['Palma'] = handMesh;
+        avatarParts[side].meshes['Estalo'] = handMesh; // Utiliza a mesma malha da mão
+
+        // --- PIVÔ DA PERNA (Quadril) ---
+        const legPivot = new THREE.Group();
+        legPivot.position.set(sign * 4, 18, 0); 
+        legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
+        legPivot.rotation.copy(legPivot.userData.restingRot);
+        legPivot.userData.isAnimating = false;
+        legPivot.userData.animProgress = 0;
+
+        const thighMesh = new THREE.Mesh(thighGeo, matPants.clone());
+        setupGlowAndShadow(thighMesh);
+        legPivot.add(thighMesh);
+
+        const footMesh = new THREE.Mesh(footGeo, matShoes.clone());
+        footMesh.position.set(0, -14, 2); // Fim da coxa
+        setupGlowAndShadow(footMesh);
+        legPivot.add(footMesh);
+
+        bodyAvatarGroup.add(legPivot);
+        avatarParts[side].legPivot = legPivot;
+        avatarParts[side].meshes['Coxa'] = thighMesh;
+        avatarParts[side].meshes['Pé'] = footMesh;
+    });
+
+    scene.add(bodyAvatarGroup);
+}
+
+function triggerAnimation(side, type) {
+    // Se for Palma, animamos os dois braços simultaneamente para se encontrarem no centro
+    if (type === 'Palma') {
+        ['L', 'R'].forEach(s => {
+            const mesh = avatarParts[s].meshes['Palma'];
+            if(mesh) {
+                mesh.userData.targetScale = 1.6;
+                mesh.userData.isAnimating = true;
+                mesh.material.emissive = new THREE.Color(0xffffff);
+                mesh.material.emissiveIntensity = 1.0;
+            }
+            const armPivot = avatarParts[s].armPivot;
+            armPivot.userData.isAnimating = true;
+            armPivot.userData.animProgress = 0;
+            armPivot.userData.animType = 'Palma';
+        });
+        return; // Terminamos aqui para as Palmas
+    }
+
+    // 1. Efeito de Brilho e Escala (Nas malhas individuais para os restantes sons)
+    const mesh = avatarParts[side].meshes[type];
+    if(mesh) {
+        mesh.userData.targetScale = (type === 'Pé') ? 1.4 : 1.6;
+        mesh.userData.isAnimating = true;
+
+        const highlightColor = side === 'L' ? new THREE.Color(0x4db6ac) : new THREE.Color(0xff8a65);
+        if(type === 'Peito') highlightColor.setHex(0xf1c40f); 
+        if(type === 'Estalo') highlightColor.setHex(0xffffff); 
+
+        mesh.material.emissive = highlightColor;
+        mesh.material.emissiveIntensity = 1.0;
+    }
+
+    // 2. Acionar Movimento Articulado (Nos pivôs)
+    const armPivot = avatarParts[side].armPivot;
+    const legPivot = avatarParts[side].legPivot;
+    
+    // Acionamos os dois para permitir sincronia (ex: braço desce enquanto perna sobe na Coxa)
+    armPivot.userData.isAnimating = true;
+    armPivot.userData.animProgress = 0;
+    armPivot.userData.animType = type;
+    
+    legPivot.userData.isAnimating = true;
+    legPivot.userData.animProgress = 0;
+    legPivot.userData.animType = type;
+}
+
+function animate3D() {
+    requestAnimationFrame(animate3D);
+    controls.update();
+
+    // Rotação Global do Corpo em relação à Timeline
+    let diff = targetBodyRotY - bodyAvatarGroup.rotation.y;
+    // Normaliza a diferença para o caminho mais curto (-PI a PI) para evitar girar pelo lado errado
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    bodyAvatarGroup.rotation.y += diff * 0.15;
+
+    // Pulsação suave geral no boneco inteiro quando toca música
+    if (state.isPlaying) {
+        const t = Date.now() * 0.005;
+        bodyAvatarGroup.position.y = Math.sin(t) * 1.5;
+    } else {
+        bodyAvatarGroup.position.y += (0 - bodyAvatarGroup.position.y) * 0.1;
+    }
+
+    // Animação indiviual (Movimento Físico Articulado + Brilho)
+    ['L', 'R'].forEach(side => {
+        const isLeft = (side === 'L');
+        const sign = isLeft ? -1 : 1;
+        
+        const armPivot = avatarParts[side].armPivot;
+        const legPivot = avatarParts[side].legPivot;
+
+        // -- Mover Braços --
+        if (armPivot.userData.isAnimating) {
+            armPivot.userData.animProgress += 0.12; // Velocidade da batida
+            if (armPivot.userData.animProgress >= 1) {
+                armPivot.userData.isAnimating = false;
+                armPivot.rotation.copy(armPivot.userData.restingRot);
+            } else {
+                const p = armPivot.userData.animProgress;
+                const bounce = Math.sin(p * Math.PI); // Curva que sobe e volta
+
+                let targetX = 0, targetZ = armPivot.userData.restingRot.z;
+                
+                // Define o destino da articulação baseando-se no que está tocando
+                switch(armPivot.userData.animType) {
+                    case 'Peito': targetX = -1.5; targetZ = sign * -1.0; break; // Mão no peito
+                    case 'Palma': targetX = -1.0; targetZ = sign * -0.7; break; // Mãos cruzam no centro
+                    case 'Estalo': targetX = -2.0; targetZ = sign * 0.4; break; // Braço pro alto
+                    case 'Coxa': targetX = -0.3; targetZ = 0; break; // Mão vai de encontro à perna (para frente e pro centro)
+                    case 'Pé': targetX = -0.3; targetZ = sign * 0.2; break; // Balanço natural andando
+                }
+
+                armPivot.rotation.x = armPivot.userData.restingRot.x + (targetX - armPivot.userData.restingRot.x) * bounce;
+                armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
+            }
+        }
+
+        // -- Mover Pernas --
+        if (legPivot.userData.isAnimating) {
+            legPivot.userData.animProgress += 0.12;
+            if (legPivot.userData.animProgress >= 1) {
+                legPivot.userData.isAnimating = false;
+                legPivot.rotation.copy(legPivot.userData.restingRot);
+            } else {
+                const p = legPivot.userData.animProgress;
+                const bounce = Math.sin(p * Math.PI);
+
+                let targetX = 0, targetZ = legPivot.userData.restingRot.z;
+
+                switch(legPivot.userData.animType) {
+                    case 'Pé': targetX = -0.6; break; // Levanta bem o joelho pra pisar
+                    case 'Coxa': targetX = -0.4; break; // Perna levanta mais para a mão alcançar a coxa
+                }
+
+                legPivot.rotation.x = legPivot.userData.restingRot.x + (targetX - legPivot.userData.restingRot.x) * bounce;
+                legPivot.rotation.z = legPivot.userData.restingRot.z + (targetZ - legPivot.userData.restingRot.z) * bounce;
+            }
+        }
+
+        // -- Efeito de Brilho (Escala/Luz nas malhas) --
+        const meshesProcessed = new Set(); // Evita processar a mesma malha 2x (como a Mão no Estalo/Palma)
+        Object.values(avatarParts[side].meshes).forEach(mesh => {
+            if(meshesProcessed.has(mesh)) return;
+            meshesProcessed.add(mesh);
+
+            if(mesh.userData.isAnimating) {
+                mesh.scale.x += (mesh.userData.targetScale - mesh.scale.x) * 0.3;
+                mesh.scale.y += (mesh.userData.targetScale - mesh.scale.y) * 0.3;
+                mesh.scale.z += (mesh.userData.targetScale - mesh.scale.z) * 0.3;
+                
+                mesh.material.emissiveIntensity -= 0.05;
+                if(mesh.material.emissiveIntensity < 0) mesh.material.emissiveIntensity = 0;
+
+                if(mesh.scale.x > mesh.userData.targetScale * 0.95) {
+                    mesh.userData.targetScale = 1.0; 
+                }
+                if(mesh.userData.targetScale === 1.0 && mesh.scale.x < 1.05) {
+                    mesh.userData.isAnimating = false;
+                    mesh.scale.set(1,1,1);
+                    mesh.material.emissiveIntensity = 0;
+                }
+            }
+        });
+    });
+
+    renderer.render(scene, camera);
+}
+
+// --- GESTÃO DE DADOS (MODAIS, GLOSSÁRIO) ---
+function toggleGlossary() { document.getElementById('glossary-panel').classList.toggle('show'); }
+
+function previewGlossaryStep(type) {
+    initAudio();
+    const side = Math.random() > 0.5 ? 'R' : 'L'; // Alterna aleatoriamente visualmente
+    setTimeout(() => {
+        const t = audioCtx.currentTime;
+        playPercussionSound(t, side, type); 
+        triggerAnimation(side, type);
+    }, 100);
+}
+
+function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
+function closeModal() { 
+    document.getElementById('modal-overlay').style.display = 'none'; 
+    document.getElementById('save-input-area').style.display = 'none'; 
+    document.getElementById('modal-confirm').style.display = 'none'; 
+}
+
+function loadSequence(seqData) {
+    state.sequence = Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null })); 
+    seqData.forEach(item => { if(item.step >= 0 && item.step < 32) state.sequence[item.step][item.f] = item.t; });
+    renderSequenceUI(); closeModal();
+}
+
+function showPresets() {
+    const title = document.getElementById('modal-title');
+    const list = document.getElementById('modal-list');
+    title.textContent = "Aprender Ritmos Básicos"; list.innerHTML = '';
+    
+    Object.keys(presets).forEach(name => {
+        const li = document.createElement('li'); li.textContent = "▶ " + name;
+        li.onclick = () => loadSequence(presets[name]); list.appendChild(li);
+    });
+
+    const saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
+    if (Object.keys(saved).length > 0) {
+        list.appendChild(document.createElement('hr'));
+        const lbl = document.createElement('div'); lbl.innerHTML = "<b>Meus Ritmos:</b>"; list.appendChild(lbl);
+        Object.keys(saved).forEach(name => {
+            const li = document.createElement('li');
+            li.innerHTML = `⭐ ${name} <span style="float:right; color:red; font-size:12px;" onclick="deleteSaved(event, '${name}')">Excluir</span>`;
+            li.onclick = (e) => { if(e.target.tagName !== 'SPAN') loadSequence(saved[name]); };
+            list.appendChild(li);
+        });
+    }
+    openModal();
+}
+
+window.deleteSaved = function(event, name) {
+    event.stopPropagation();
+    if(confirm(`Excluir '${name}'?`)) {
+        let saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
+        delete saved[name]; localStorage.setItem('bodyPercussionSeq', JSON.stringify(saved));
+        showPresets(); 
+    }
+}
+
+function showSaveMenu() {
+    document.getElementById('modal-title').textContent = "Salvar Ritmo";
+    document.getElementById('modal-list').innerHTML = '';
+    document.getElementById('save-input-area').style.display = 'block';
+    const btn = document.getElementById('modal-confirm');
+    btn.style.display = 'block';
+    
+    const input = document.getElementById('save-name');
+    input.value = ''; input.focus();
+
+    btn.onclick = () => {
+        const name = input.value.trim();
+        if(!name) { alert("Digite um nome!"); return; }
+        const dataToSave = [];
+        state.sequence.forEach((step, index) => {
+            if(step.Pos) dataToSave.push({step: index, f: 'Pos', t: step.Pos});
+            if(step.L) dataToSave.push({step: index, f: 'L', t: step.L});
+            if(step.R) dataToSave.push({step: index, f: 'R', t: step.R});
+        });
+        if(dataToSave.length === 0) { alert("A sequência está vazia!"); return; }
+
+        let saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
+        saved[name] = dataToSave;
+        localStorage.setItem('bodyPercussionSeq', JSON.stringify(saved));
+        alert("Salvo com sucesso!"); closeModal();
+    };
+    openModal();
+}
+
+window.onload = () => {
+    initThreeJS();
+    initUI();
+    renderSequenceUI();
+    loadSequence(presets["2. Rock Stadium (We Will Rock You)"]);
+};
+</script>
+</body>
+</html>
