@@ -59,6 +59,22 @@
         }
         #canvas3d:active { cursor: grabbing; }
 
+        /* Título do App sobre o Palco 3D */
+        #app-title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.8em;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            z-index: 10;
+            pointer-events: none;
+        }
+
         #hint {
             position: absolute;
             top: 15px;
@@ -242,6 +258,19 @@
         .modal-list li:hover { background: #f9f9f9; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
+        /* Footer */
+        #footer-credits {
+            background: var(--ui-bg);
+            border-top: 1px solid var(--ui-border);
+            text-align: center;
+            padding: 8px;
+            font-size: 0.75em;
+            color: #777;
+            line-height: 1.4;
+        }
+        #footer-credits a { color: #3498db; text-decoration: none; }
+        #footer-credits a:hover { text-decoration: underline; }
+
         @media (max-width: 768px) {
             #main-workspace { flex-direction: column; }
             #library { width: 100%; min-width: 100%; border-right: none; border-bottom: 2px solid var(--ui-border); max-height: 200px; }
@@ -262,7 +291,8 @@
 
     <!-- 1. PALCO 3D -->
     <div id="stage-container">
-        <div id="hint">🖱️ <b>Câmera 3D:</b> Clique e arraste para girar. Role para Zoom.</div>
+        <div id="app-title">Perc Corporal</div>
+        <div id="hint">🖱️ <b>3D</b></div>
         
         <!-- GLOSSÁRIO FLUTUANTE -->
         <div id="glossary-panel">
@@ -351,6 +381,13 @@
         </div>
     </div>
 
+    <!-- 5. CRÉDITOS -->
+    <div id="footer-credits">
+        Desenvolvido pelo professor <b>Glauber Santiago</b> — DAC/UFSCar<br>
+        <a href="http://servidores.ufscar.br/glauber/" target="_blank">servidores.ufscar.br/glauber/</a> • 
+        <a href="https://sites.google.com/view/glauberia" target="_blank">sites.google.com/view/glauberia</a>
+    </div>
+
     <!-- Modal Base -->
     <div id="modal-overlay">
         <div id="modal-content">
@@ -391,9 +428,16 @@ let targetBodyRotY = 0;
  * ============================================================================
  */
 let presets = {
-    "1. Ritmo de Segurança (Aguardando padroes.js)": [ 
-        {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'L', t: 'Pé'}, 
-        {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Pé'} 
+    "1. Demonstração (Aguardando padroes.js)": [ 
+        {step: 0, f: 'L', t: 'Pé'}, {step: 2, f: 'R', t: 'Pé'}, 
+        {step: 4, f: 'L', t: 'Coxa'}, 
+        {step: 6, f: 'R', t: 'Coxa'}, {step: 6, f: 'L', t: 'Pé'},
+        {step: 7, f: 'Pos', t: 'Dir'}, {step: 7, f: 'L', t: 'Estalo'},
+        {step: 8, f: 'Pos', t: 'Frente'}, {step: 8, f: 'R', t: 'Coxa'}, {step: 8, f: 'L', t: 'Coxa'},
+        {step: 10, f: 'R', t: 'Palma'},
+        {step: 12, f: 'L', t: 'Peito'}, {step: 14, f: 'R', t: 'Peito'},
+        {step: 16, f: 'L', t: 'Estalo'}, {step: 18, f: 'R', t: 'Estalo'},
+        {step: 20, f: 'Pos', t: 'Esq'}
     ]
 };
 
@@ -761,7 +805,7 @@ function initThreeJS() {
     scene.fog = new THREE.Fog(0x2a1f1a, 100, 400); // Neblina
 
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1000);
-    camera.position.set(100, 100, 150); // Posição inicial da câmera
+    camera.position.set(60, 60, 90); // Zoom mais aproximado (antes era 100, 100, 150)
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
