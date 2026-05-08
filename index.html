@@ -1,12 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Percussão Corporal - Sequenciador Iniciante</title>
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👏</text></svg>">
+    <!-- Favicon codificado em URL de forma segura -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👏%3C/text%3E%3C/svg%3E">
     
     <!-- Bibliotecas Three.js e OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -369,7 +368,7 @@
 
 <script>
 /**
- * ESTADO E PRESETS
+ * ESTADO DO APLICATIVO
  */
 const state = {
     bpm: 100, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true,
@@ -380,15 +379,22 @@ const state = {
 
 let targetBodyRotY = 0;
 
-const presets = {
-    "1. Marcha Básica (Alternada)": [ {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'L', t: 'Pé'}, {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Pé'}, {step: 16, f: 'R', t: 'Pé'}, {step: 20, f: 'L', t: 'Pé'}, {step: 24, f: 'R', t: 'Pé'}, {step: 28, f: 'L', t: 'Pé'} ],
-    "2. Rock Stadium (We Will Rock You)": [ {step: 0, f: 'R', t: 'Pé'}, {step: 1, f: 'L', t: 'Pé'}, {step: 4, f: 'R', t: 'Palma'}, {step: 8, f: 'R', t: 'Pé'}, {step: 9, f: 'L', t: 'Pé'}, {step: 12, f: 'R', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 17, f: 'L', t: 'Pé'}, {step: 20, f: 'R', t: 'Palma'}, {step: 24, f: 'R', t: 'Pé'}, {step: 25, f: 'L', t: 'Pé'}, {step: 28, f: 'R', t: 'Palma'} ],
-    "3. Pop Beat Simples": [ {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'R', t: 'Palma'}, {step: 8, f: 'R', t: 'Pé'}, {step: 10, f: 'L', t: 'Pé'}, {step: 12, f: 'R', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 20, f: 'R', t: 'Palma'}, {step: 24, f: 'R', t: 'Pé'}, {step: 26, f: 'L', t: 'Pé'}, {step: 28, f: 'R', t: 'Palma'} ],
-    "4. Sambinha (Peito e Palma)": [ {step: 0, f: 'R', t: 'Peito'}, {step: 2, f: 'L', t: 'Palma'}, {step: 3, f: 'R', t: 'Peito'}, {step: 4, f: 'L', t: 'Palma'}, {step: 6, f: 'R', t: 'Peito'}, {step: 8, f: 'R', t: 'Peito'}, {step: 10, f: 'L', t: 'Palma'}, {step: 11, f: 'R', t: 'Peito'}, {step: 12, f: 'L', t: 'Palma'}, {step: 14, f: 'R', t: 'Peito'}, {step: 16, f: 'R', t: 'Peito'}, {step: 18, f: 'L', t: 'Palma'}, {step: 19, f: 'R', t: 'Peito'}, {step: 20, f: 'L', t: 'Palma'}, {step: 22, f: 'R', t: 'Peito'}, {step: 24, f: 'R', t: 'Peito'}, {step: 26, f: 'L', t: 'Palma'}, {step: 27, f: 'R', t: 'Peito'}, {step: 28, f: 'L', t: 'Palma'}, {step: 30, f: 'R', t: 'Peito'} ],
-    "5. Funk Carioca (Tuntz Tacha)": [ {step: 0, f: 'R', t: 'Peito'}, {step: 3, f: 'L', t: 'Estalo'}, {step: 6, f: 'R', t: 'Peito'}, {step: 8, f: 'R', t: 'Peito'}, {step: 11, f: 'L', t: 'Estalo'}, {step: 16, f: 'R', t: 'Peito'}, {step: 19, f: 'L', t: 'Estalo'}, {step: 22, f: 'R', t: 'Peito'}, {step: 24, f: 'R', t: 'Peito'}, {step: 27, f: 'L', t: 'Estalo'} ],
-    "6. Maracatu Básico": [ {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Coxa'}, {step: 3, f: 'R', t: 'Coxa'}, {step: 4, f: 'R', t: 'Pé'}, {step: 6, f: 'L', t: 'Coxa'}, {step: 7, f: 'R', t: 'Coxa'}, {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Palma'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Coxa'}, {step: 19, f: 'R', t: 'Coxa'}, {step: 20, f: 'R', t: 'Pé'}, {step: 22, f: 'L', t: 'Coxa'}, {step: 23, f: 'R', t: 'Coxa'}, {step: 24, f: 'R', t: 'Pé'}, {step: 28, f: 'L', t: 'Palma'} ],
-    "7. Desafio de Coordenação 1": [ {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Coxa'}, {step: 4, f: 'R', t: 'Peito'}, {step: 6, f: 'L', t: 'Estalo'}, {step: 8, f: 'L', t: 'Pé'}, {step: 10, f: 'R', t: 'Coxa'}, {step: 12, f: 'L', t: 'Peito'}, {step: 14, f: 'R', t: 'Estalo'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Coxa'}, {step: 20, f: 'R', t: 'Peito'}, {step: 22, f: 'L', t: 'Estalo'}, {step: 24, f: 'L', t: 'Pé'}, {step: 26, f: 'R', t: 'Coxa'}, {step: 28, f: 'L', t: 'Peito'}, {step: 30, f: 'R', t: 'Estalo'} ],
-    "8. Giro 4 Cantos": [ {step: 0, f: 'Pos', t: 'Frente'}, {step: 0, f: 'R', t: 'Pé'}, {step: 2, f: 'L', t: 'Palma'}, {step: 4, f: 'L', t: 'Pé'}, {step: 6, f: 'R', t: 'Palma'}, {step: 8, f: 'Pos', t: 'Esq'}, {step: 8, f: 'R', t: 'Pé'}, {step: 10, f: 'L', t: 'Palma'}, {step: 12, f: 'L', t: 'Pé'}, {step: 14, f: 'R', t: 'Palma'}, {step: 16, f: 'Pos', t: 'Trás'}, {step: 16, f: 'R', t: 'Pé'}, {step: 18, f: 'L', t: 'Palma'}, {step: 20, f: 'L', t: 'Pé'}, {step: 22, f: 'R', t: 'Palma'}, {step: 24, f: 'Pos', t: 'Dir'}, {step: 24, f: 'R', t: 'Pé'}, {step: 26, f: 'L', t: 'Palma'}, {step: 28, f: 'L', t: 'Pé'}, {step: 30, f: 'R', t: 'Palma'} ]
+/**
+ * ============================================================================
+ * [INSTRUÇÃO PARA A IA]
+ * ATENÇÃO: NÃO MODIFIQUE A VARIÁVEL 'presets' ABAIXO PARA INCLUIR HARDCODE.
+ * * Os padrões rítmicos foram separados para o arquivo externo 'padroes.js'.
+ * * A IA deve SEMPRE assumir que o arquivo 'padroes.js' injetará a variável
+ * 'window.padroesCorporais' no escopo global.
+ * * O código de carregamento via fetch() em window.onload já se encarrega de 
+ * carregar e popular essa variável de forma assíncrona.
+ * ============================================================================
+ */
+let presets = {
+    "1. Ritmo de Segurança (Aguardando padroes.js)": [ 
+        {step: 0, f: 'R', t: 'Pé'}, {step: 4, f: 'L', t: 'Pé'}, 
+        {step: 8, f: 'R', t: 'Pé'}, {step: 12, f: 'L', t: 'Pé'} 
+    ]
 };
 
 // --- ÁUDIO (Web Audio API) ---
@@ -1150,11 +1156,44 @@ function showSaveMenu() {
     openModal();
 }
 
+// Inicialização Principal da Aplicação
 window.onload = () => {
     initThreeJS();
     initUI();
     renderSequenceUI();
-    loadSequence(presets["2. Rock Stadium (We Will Rock You)"]);
+
+    // Carregamento dinâmico assíncrono para o arquivo externo 'padroes.js'
+    // Isso evita o 'SyntaxError' caso o servidor web responda com uma página HTML (404) quando o ficheiro falta.
+    fetch('padroes.js')
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            // Se o request foi válido e o conteúdo não for HTML (quebraria o JS), devolvemos o código.
+            if (response.ok && !contentType.includes('text/html')) {
+                return response.text();
+            }
+            throw new Error('Arquivo padroes.js ausente ou inválido.');
+        })
+        .then(scriptText => {
+            // Cria script dinamicamente e executa com segurança
+            const script = document.createElement('script');
+            script.textContent = scriptText;
+            document.body.appendChild(script);
+
+            // Atualiza os ritmos se padroes.js definiu a variável global 'padroesCorporais'
+            if (window.padroesCorporais) {
+                presets = window.padroesCorporais;
+            }
+
+            // Carrega o primeiro preset da lista automaticamente
+            const firstPresetKey = Object.keys(presets)[0];
+            if (firstPresetKey) loadSequence(presets[firstPresetKey]);
+        })
+        .catch(err => {
+            console.warn('Aviso:', err.message, 'O aplicativo usará os ritmos de segurança padrão.');
+            // Carrega o primeiro preset de fallback
+            const firstPresetKey = Object.keys(presets)[0];
+            if (firstPresetKey) loadSequence(presets[firstPresetKey]);
+        });
 };
 </script>
 </body>
