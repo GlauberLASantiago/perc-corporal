@@ -62,8 +62,8 @@
         /* Título do App sobre o Palco 3D */
         #app-title {
             position: absolute;
-            bottom: 20px; /* Movido para a borda inferior */
-            left: 20px;   /* Movido para a borda esquerda */
+            bottom: 20px;
+            left: 20px;
             font-size: 1.8em;
             font-weight: 900;
             color: rgba(255, 255, 255, 0.9);
@@ -223,7 +223,7 @@
             position: absolute;
             top: 20px; bottom: 10px; width: 3px;
             background-color: rgba(255, 0, 0, 0.6);
-            pointer-events: none; transition: left 0.1s linear; /* Deixado rápido para a fila visual */
+            pointer-events: none; transition: left 0.1s linear; 
             left: 65px; z-index: 5;
             box-shadow: 0 0 5px rgba(255,0,0,0.5);
         }
@@ -406,7 +406,7 @@
 
 <script>
 /**
- * ESTADO DO APLICATIVO
+ * ESTADO DO APLICATIVO E DA DAW
  */
 const state = {
     bpm: 90, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, turmaMode: false,
@@ -418,8 +418,11 @@ const state = {
 let targetBodyRotY = 0;
 let visualQueue = []; // FILA VISUAL PARA SINCRONISMO PERFEITO
 
+// Variável para a âncora de tempo da DAW
+let loopStartTime = 0; 
+
 let presets = {
-    "1. Demonstração (Aguardando padroes.js)": [ 
+    "1. Demonstração (Padrão)": [ 
         {step: 0, f: 'Pos', t: 'Frente'}, {step: 0, f: 'L', t: 'Pé'}, {step: 2, f: 'R', t: 'Pé'}, 
         {step: 4, f: 'L', t: 'Coxa'}, 
         {step: 6, f: 'R', t: 'Coxa'}, {step: 6, f: 'L', t: 'Pé'},
@@ -480,13 +483,11 @@ function initAudio() {
 function playPercussionSound(time, side, type) {
     if (!audioCtx) return;
 
-    // Identificar qual sample usar
     let bufferKey = type === 'Palma' ? type : `${type}_${side}`;
     let buffer = audioBuffers[bufferKey];
 
     if (!buffer) return;
 
-    // Função interna para tocar um único buffer
     const playSingleHit = (hitTime, hitPanValue, hitVol) => {
         const gain = audioCtx.createGain();
         const panNode = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
@@ -506,32 +507,22 @@ function playPercussionSound(time, side, type) {
         source.start(hitTime);
     };
 
-    // Ajuste de volume base
     let baseVol = 1.0;
     if(type === 'Pé') baseVol = 1.2;
     if(type === 'Estalo') baseVol = 0.8;
     if(type === 'Peito') baseVol = 1.2; 
 
-    // Panorâmica Base
     let basePan = type === 'Palma' ? 0 : (side === 'L' ? -0.4 : 0.4);
 
-    // Tocar Som Principal
     playSingleHit(time, basePan, baseVol);
 
-    // Tocar Ecos/Clones se MODO TURMA estiver ativado
     if (state.turmaMode) {
-        const numClones = 4; // 4 clones de áudio já geram um bom efeito de "Bando"
+        const numClones = 4; 
         for (let i = 0; i < numClones; i++) {
-            // Atraso aleatório entre 15ms e 55ms
             const delay = (Math.random() * 0.04) + 0.015; 
             const cloneTime = time + delay;
-            
-            // Panorâmica aleatória para espalhar pela sala virtual
             const clonePan = (Math.random() * 2) - 1; 
-            
-            // Volume ligeiramente mais baixo para os clones se misturarem sem estourar o limite
             const cloneVol = baseVol * (0.3 + Math.random() * 0.4); 
-
             playSingleHit(cloneTime, clonePan, cloneVol);
         }
     }
@@ -550,18 +541,44 @@ function playMetronome(time, beatIndex) {
     osc.start(time); osc.stop(time + 0.05);
 }
 
+// O CORE DO DAW: Matemática baseada em âncora fixa para não perder sincronismo
 function nextNote() {
     const secondsPerStep = (60.0 / (state.bpm * state.speedMultiplier)) / 4; 
-    nextNoteTime += secondsPerStep;
     state.currentStep++;
+    
     if (state.currentStep >= state.totalSteps) {
-        if(state.loopOn) state.currentStep = 0;
-        else stopPlayback();
+        if(state.loopOn) {
+            state.currentStep = 0;
+            // Avança a âncora fixa pelo tamanho exato do loop
+            loopStartTime += (state.totalSteps * secondsPerStep);
+            
+            // Sincroniza forçado no início de cada loop inteiro
+            if (bgMusicEnabled && !bgMusic.paused) {
+                bgMusic.currentTime = 0;
+            }
+        } else {
+            stopPlayback();
+            return;
+        }
+    }
+    
+    // Calcula o próximo tempo somando apenas os compassos em relação à âncora 
+    // Isso anula acúmulo de erros de ponto flutuante.
+    nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
+    
+    // A cada compasso (16 steps), forçar atualização do sincronismo da música de fundo (DOM vs DAW)
+    if (state.currentStep % 16 === 0 && state.currentStep !== 0) {
+        if (bgMusicEnabled && !bgMusic.paused) {
+            const expectedBgmTime = state.currentStep * secondsPerStep;
+            // Se o DOM Audio (música) tiver mais de 50ms de diferença para a Web Audio API (Metrônomo), corrige ele:
+            if (Math.abs(bgMusic.currentTime - expectedBgmTime) > 0.05) {
+                bgMusic.currentTime = expectedBgmTime;
+            }
+        }
     }
 }
 
-// O CORE DO DAW: Esta função roda ANTECIPADAMENTE (Lookahead)
-// Agora ela só cuida do ÁUDIO, e guarda as animações numa fila
+// Função agendadora de antecipação visual e sonora
 function scheduleNote(stepNumber, time) {
     // 1. Áudio Preciso (Web Audio API)
     playMetronome(time, stepNumber);
@@ -573,7 +590,7 @@ function scheduleNote(stepNumber, time) {
     // 2. Visual Agendado (Fila para ser lida no requestAnimationFrame)
     visualQueue.push({
         step: stepNumber,
-        time: time, // O milissegundo exato que o som vai tocar
+        time: time, 
         data: stepData
     });
 }
@@ -591,13 +608,14 @@ function scheduler() {
 function togglePlayback() { initAudio(); state.isPlaying ? stopPlayback() : startPlayback(); }
 
 function startPlayback() {
-    state.isPlaying = true; state.currentStep = 0;
+    state.isPlaying = true; 
+    state.currentStep = 0;
     targetBodyRotY = 0; 
-    visualQueue = []; // Limpar fila antiga
+    visualQueue = []; 
     
-    // Um pequeno delay para dar tempo do navegador iniciar tudo em perfeita sincronia com a música base
     const startDelay = 0.05;
-    nextNoteTime = audioCtx.currentTime + startDelay;
+    loopStartTime = audioCtx.currentTime + startDelay;
+    nextNoteTime = loopStartTime;
     
     if (bgMusicEnabled) {
         bgMusic.currentTime = 0;
@@ -612,7 +630,7 @@ function startPlayback() {
 function stopPlayback() {
     state.isPlaying = false; window.clearTimeout(timerID);
     targetBodyRotY = 0; 
-    visualQueue = []; // Parar e limpar tudo
+    visualQueue = []; 
     
     bgMusic.pause();
     bgMusic.currentTime = 0;
@@ -821,19 +839,17 @@ function updatePlayheadUI(stepIndex) {
 // --- RENDERING 3D (THREE.JS) ---
 let scene, camera, renderer, controls;
 
-// Array Global para guardar todos os Avatares (Professor + Clones)
 let allAvatars = []; 
 
 function initThreeJS() {
     const container = document.getElementById('canvas3d');
     
-    // 1. Configuração Básica da Cena, Neblina e Câmera
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x2a1f1a); 
     scene.fog = new THREE.Fog(0x2a1f1a, 100, 400); 
 
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1000);
-    camera.position.set(60, 60, 110); // Um pouco mais longe para ver a turma
+    camera.position.set(60, 60, 110);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -847,7 +863,6 @@ function initThreeJS() {
     controls.target.set(0, 20, 0); 
     controls.maxPolarAngle = Math.PI / 2 + 0.05; 
 
-    // 2. Configuração das Luzes
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
     scene.add(ambientLight);
 
@@ -862,7 +877,6 @@ function initThreeJS() {
     fillLight.position.set(-50, 50, -50);
     scene.add(fillLight);
 
-    // 3. Chão
     const floorGeometry = new THREE.PlaneGeometry(500, 500); 
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2e15, roughness: 0.6, metalness: 0.1 }); 
     const floorPlane = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -876,7 +890,6 @@ function initThreeJS() {
     gridHelper.position.y = 0.1; 
     scene.add(gridHelper);
 
-    // Iniciar a Turma
     initAvatars();
 
     window.addEventListener('resize', () => {
@@ -888,13 +901,11 @@ function initThreeJS() {
     animate3D();
 }
 
-// Factory para criar um Boneco Genérico
 function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.scale.set(scaleParam, scaleParam, scaleParam);
     
-    // Armazena as referencias internas para esse boneco específico
     const parts = {
         L: { armPivot: null, legPivot: null, meshes: {} },
         R: { armPivot: null, legPivot: null, meshes: {} }
@@ -913,19 +924,16 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         mesh.userData.isAnimating = false;
     };
 
-    // Cabeça
     const head = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 32), matSkin);
     head.position.set(0, 36, 0); 
     head.castShadow = true;
     group.add(head);
 
-    // Tronco
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(7, 6, 16, 16), matShirt);
     torso.position.set(0, 26, 0);
     torso.castShadow = true;
     group.add(torso);
 
-    // Peito (L/R)
     const chestGeo = new THREE.BoxGeometry(6, 8, 8);
     const chestL = new THREE.Mesh(chestGeo, matShirt.clone());
     chestL.position.set(-4, 28, 2);
@@ -951,7 +959,6 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         const isLeft = side === 'L';
         const sign = isLeft ? -1 : 1;
 
-        // --- PIVÔ DO BRAÇO ---
         const armPivot = new THREE.Group();
         armPivot.position.set(sign * 9, 33, 0); 
         armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.2); 
@@ -973,7 +980,6 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         parts[side].meshes['Palma'] = handMesh;
         parts[side].meshes['Estalo'] = handMesh; 
 
-        // --- PIVÔ DA PERNA ---
         const legPivot = new THREE.Group();
         legPivot.position.set(sign * 4, 18, 0); 
         legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
@@ -1002,36 +1008,29 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
 function initAvatars() {
     allAvatars = [];
     
-    // 1. Criar Professor Principal (Centro)
     const mainAvatar = createSingleAvatar(true, 0, 0, 1.0, 0xffccaa, 0x34495e, 0x2c3e50);
     allAvatars.push(mainAvatar);
     scene.add(mainAvatar.group);
 
-    // 2. Criar Clones para a Turma
     const skinColors = [0xffccaa, 0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x4d2a22, 0xffbfa3];
     const clothesColors = [0xe74c3c, 0x2ecc71, 0x9b59b6, 0xf1c40f, 0xe67e22, 0x1abc9c, 0x3498db, 0x95a5a6, 0xd35400, 0x27ae60];
 
     const numClones = 10;
     for (let i = 0; i < numClones; i++) {
-        // Distribui num arco atrás do professor
-        const angle = Math.PI + (Math.random() - 0.5) * Math.PI * 1.5; // Espalhados atrás e pros lados
-        
-        // Clones 3x mais distantes: de (20 + 30) para (60 + 90)
+        const angle = Math.PI + (Math.random() - 0.5) * Math.PI * 1.5; 
         const radius = 60 + Math.random() * 90;
         
         const x = Math.sin(angle) * radius;
         const z = Math.cos(angle) * radius - 10; 
 
-        // Escala variada para alturas diferentes
-        const scale = 0.85 + Math.random() * 0.3; // 0.85 a 1.15
+        const scale = 0.85 + Math.random() * 0.3; 
 
-        // Cores aleatórias
         const skin = skinColors[Math.floor(Math.random() * skinColors.length)];
         const shirt = clothesColors[Math.floor(Math.random() * clothesColors.length)];
         const pants = clothesColors[Math.floor(Math.random() * clothesColors.length)];
 
         const clone = createSingleAvatar(false, x, z, scale, skin, shirt, pants);
-        clone.group.visible = false; // Começam escondidos até ligar o Modo Turma
+        clone.group.visible = false; 
         
         allAvatars.push(clone);
         scene.add(clone.group);
@@ -1039,7 +1038,6 @@ function initAvatars() {
 }
 
 function triggerAnimation(side, type) {
-    // Aciona a animação para TODOS os avatares visíveis
     allAvatars.forEach(avatar => {
         if (!avatar.group.visible) return;
 
@@ -1090,15 +1088,11 @@ function animate3D() {
     requestAnimationFrame(animate3D);
     controls.update();
 
-    // --- NOVO: SINCRONIZAÇÃO VISUAL COM PRECISÃO DE ÁUDIO ---
     if (audioCtx && state.isPlaying) {
         let currTime = audioCtx.currentTime;
-        // Desenfileira eventos visuais se o tempo do relógio da placa de áudio tiver chegado!
-        // A margem de +0.015s serve para que o visual acerte a taxa de frames do monitor (60hz) perfeitamente a tempo.
         while (visualQueue.length > 0 && visualQueue[0].time <= currTime + 0.015) {
             let evt = visualQueue.shift();
 
-            // Rotação programada
             if (evt.data.Pos) {
                 switch(evt.data.Pos) {
                     case 'Frente': targetBodyRotY = 0; break;
@@ -1108,26 +1102,20 @@ function animate3D() {
                 }
             }
 
-            // Animações dos membros e brilhos
             if (evt.data.L) triggerAnimation('L', evt.data.L);
             if (evt.data.R) triggerAnimation('R', evt.data.R);
 
-            // Playhead da timeline
             updatePlayheadUI(evt.step);
         }
     }
 
-    // Roda sobre toda a Turma
     allAvatars.forEach(avatar => {
         if (!avatar.group.visible) return;
 
-        // 1. Rotação Global do Corpo
         let diff = targetBodyRotY - avatar.group.rotation.y;
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
         avatar.group.rotation.y += diff * 0.15;
 
-        // 2. Pulsação Base (Balanço com a música)
-        // Adicionando um offset com o id ou posição X para eles não balançarem de forma perfeitamente idêntica
         if (state.isPlaying) {
             const t = Date.now() * 0.005;
             const offset = avatar.group.position.x * 0.1; 
@@ -1136,7 +1124,6 @@ function animate3D() {
             avatar.group.position.y += (0 - avatar.group.position.y) * 0.1;
         }
 
-        // 3. Animação de Membros e Brilho para cada Lado
         ['L', 'R'].forEach(side => {
             const isLeft = (side === 'L');
             const sign = isLeft ? -1 : 1;
@@ -1144,7 +1131,6 @@ function animate3D() {
             const armPivot = avatar.parts[side].armPivot;
             const legPivot = avatar.parts[side].legPivot;
 
-            // -- Mover Braços --
             if (armPivot.userData.isAnimating) {
                 armPivot.userData.animProgress += 0.12; 
                 if (armPivot.userData.animProgress >= 1) {
@@ -1169,7 +1155,6 @@ function animate3D() {
                 }
             }
 
-            // -- Mover Pernas --
             if (legPivot.userData.isAnimating) {
                 legPivot.userData.animProgress += 0.12;
                 if (legPivot.userData.animProgress >= 1) {
@@ -1191,7 +1176,6 @@ function animate3D() {
                 }
             }
 
-            // -- Efeito de Brilho e Escala nas Malhas --
             const meshesProcessed = new Set(); 
             Object.values(avatar.parts[side].meshes).forEach(mesh => {
                 if(meshesProcessed.has(mesh)) return;
@@ -1221,7 +1205,6 @@ function animate3D() {
     renderer.render(scene, camera);
 }
 
-// --- GESTÃO DE DADOS (MODAIS, GLOSSÁRIO) ---
 function toggleGlossary() { document.getElementById('glossary-panel').classList.toggle('show'); }
 
 function previewGlossaryStep(type) {
@@ -1314,6 +1297,11 @@ window.onload = () => {
     initUI();
     renderSequenceUI();
 
+    // 1. CARREGA A DEMONSTRAÇÃO IMEDIATAMENTE (GARANTE QUE É O PRIMEIRO A APARECER)
+    const demoKey = Object.keys(presets)[0];
+    if (demoKey) loadSequence(presets[demoKey]);
+
+    // 2. BUSCA padroes.js DE FORMA ASSÍNCRONA SEM INTERROMPER A DEMONSTRAÇÃO
     fetch('padroes.js')
         .then(response => {
             const contentType = response.headers.get('content-type') || '';
@@ -1327,17 +1315,13 @@ window.onload = () => {
             script.textContent = scriptText;
             document.body.appendChild(script);
 
+            // Adiciona (mescla) os novos ritmos sem apagar a demonstração e sem forçar mudança de tela
             if (window.padroesCorporais) {
-                presets = window.padroesCorporais;
+                presets = Object.assign({}, presets, window.padroesCorporais);
             }
-
-            const firstPresetKey = Object.keys(presets)[0];
-            if (firstPresetKey) loadSequence(presets[firstPresetKey]);
         })
         .catch(err => {
-            console.warn('Aviso:', err.message, 'O aplicativo usará os ritmos de segurança padrão.');
-            const firstPresetKey = Object.keys(presets)[0];
-            if (firstPresetKey) loadSequence(presets[firstPresetKey]);
+            console.warn('Aviso:', err.message, 'O aplicativo usará apenas o ritmo de demonstração.');
         });
 };
 </script>
