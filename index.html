@@ -223,7 +223,7 @@
             position: absolute;
             top: 20px; bottom: 10px; width: 3px;
             background-color: rgba(255, 0, 0, 0.6);
-            pointer-events: none; transition: left 0.1s linear;
+            pointer-events: none; transition: left 0.1s linear; /* Deixado rápido para a fila visual */
             left: 65px; z-index: 5;
             box-shadow: 0 0 5px rgba(255,0,0,0.5);
         }
@@ -354,8 +354,8 @@
         
         <div class="control-group">
             <label>BPM:</label>
-            <input type="range" id="bpm-slider" min="40" max="180" value="100">
-            <span id="bpm-display" class="bpm-display">100</span>
+            <input type="range" id="bpm-slider" min="40" max="180" value="90">
+            <span id="bpm-display" class="bpm-display">90</span>
             <label style="margin-left: 10px;">Velocidade:</label>
             <select id="speed-select">
                 <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
@@ -409,13 +409,14 @@
  * ESTADO DO APLICATIVO
  */
 const state = {
-    bpm: 100, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, turmaMode: false,
+    bpm: 90, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, turmaMode: false,
     totalSteps: 32, currentStep: 0,
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null })),
     selectedTool: null, draggedData: null
 };
 
 let targetBodyRotY = 0;
+let visualQueue = []; // FILA VISUAL PARA SINCRONISMO PERFEITO
 
 let presets = {
     "1. Demonstração (Aguardando padroes.js)": [ 
@@ -453,7 +454,7 @@ const audioUrls = {
 
 const audioBuffers = {};
 
-let bgMusic = new Audio('https://upload.wikimedia.org/wikipedia/commons/5/5b/Kevin_MacLeod_-_Carefree.ogg');
+let bgMusic = new Audio('https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/musica-demo-90bpm.mp3');
 bgMusic.loop = true;
 bgMusic.volume = 0.3;
 let bgMusicEnabled = true;
@@ -559,23 +560,22 @@ function nextNote() {
     }
 }
 
+// O CORE DO DAW: Esta função roda ANTECIPADAMENTE (Lookahead)
+// Agora ela só cuida do ÁUDIO, e guarda as animações numa fila
 function scheduleNote(stepNumber, time) {
+    // 1. Áudio Preciso (Web Audio API)
     playMetronome(time, stepNumber);
     const stepData = state.sequence[stepNumber];
 
-    if (stepData.Pos) {
-        switch(stepData.Pos) {
-            case 'Frente': targetBodyRotY = 0; break;
-            case 'Esq': targetBodyRotY = Math.PI / 2; break;
-            case 'Trás': targetBodyRotY = Math.PI; break;
-            case 'Dir': targetBodyRotY = -Math.PI / 2; break;
-        }
-    }
+    if (stepData.L) playPercussionSound(time, 'L', stepData.L);
+    if (stepData.R) playPercussionSound(time, 'R', stepData.R);
 
-    if (stepData.L) { playPercussionSound(time, 'L', stepData.L); triggerAnimation('L', stepData.L); }
-    if (stepData.R) { playPercussionSound(time, 'R', stepData.R); triggerAnimation('R', stepData.R); }
-
-    setTimeout(() => { updatePlayheadUI(stepNumber); }, Math.max(0, (time - audioCtx.currentTime) * 1000));
+    // 2. Visual Agendado (Fila para ser lida no requestAnimationFrame)
+    visualQueue.push({
+        step: stepNumber,
+        time: time, // O milissegundo exato que o som vai tocar
+        data: stepData
+    });
 }
 
 function scheduler() {
@@ -593,7 +593,11 @@ function togglePlayback() { initAudio(); state.isPlaying ? stopPlayback() : star
 function startPlayback() {
     state.isPlaying = true; state.currentStep = 0;
     targetBodyRotY = 0; 
-    nextNoteTime = audioCtx.currentTime + 0.05;
+    visualQueue = []; // Limpar fila antiga
+    
+    // Um pequeno delay para dar tempo do navegador iniciar tudo em perfeita sincronia com a música base
+    const startDelay = 0.05;
+    nextNoteTime = audioCtx.currentTime + startDelay;
     
     if (bgMusicEnabled) {
         bgMusic.currentTime = 0;
@@ -608,6 +612,7 @@ function startPlayback() {
 function stopPlayback() {
     state.isPlaying = false; window.clearTimeout(timerID);
     targetBodyRotY = 0; 
+    visualQueue = []; // Parar e limpar tudo
     
     bgMusic.pause();
     bgMusic.currentTime = 0;
@@ -1084,6 +1089,33 @@ function triggerAnimation(side, type) {
 function animate3D() {
     requestAnimationFrame(animate3D);
     controls.update();
+
+    // --- NOVO: SINCRONIZAÇÃO VISUAL COM PRECISÃO DE ÁUDIO ---
+    if (audioCtx && state.isPlaying) {
+        let currTime = audioCtx.currentTime;
+        // Desenfileira eventos visuais se o tempo do relógio da placa de áudio tiver chegado!
+        // A margem de +0.015s serve para que o visual acerte a taxa de frames do monitor (60hz) perfeitamente a tempo.
+        while (visualQueue.length > 0 && visualQueue[0].time <= currTime + 0.015) {
+            let evt = visualQueue.shift();
+
+            // Rotação programada
+            if (evt.data.Pos) {
+                switch(evt.data.Pos) {
+                    case 'Frente': targetBodyRotY = 0; break;
+                    case 'Esq': targetBodyRotY = Math.PI / 2; break;
+                    case 'Trás': targetBodyRotY = Math.PI; break;
+                    case 'Dir': targetBodyRotY = -Math.PI / 2; break;
+                }
+            }
+
+            // Animações dos membros e brilhos
+            if (evt.data.L) triggerAnimation('L', evt.data.L);
+            if (evt.data.R) triggerAnimation('R', evt.data.R);
+
+            // Playhead da timeline
+            updatePlayheadUI(evt.step);
+        }
+    }
 
     // Roda sobre toda a Turma
     allAvatars.forEach(avatar => {
