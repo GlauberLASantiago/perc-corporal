@@ -413,7 +413,8 @@ const audioUrls = {
     'Estalo_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-d.mp3',
     'Estalo_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-e.mp3',
     'Palma': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/palmas.mp3',
-    'Peito': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito.mp3'
+    'Peito_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito-d.mp3',
+    'Peito_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito-e.mp3'
 };
 
 // Armazena os áudios decodificados
@@ -459,8 +460,8 @@ function playPercussionSound(time, side, type) {
     gain.connect(panNode); 
     panNode.connect(audioCtx.destination);
 
-    // Identificar qual sample usar (Palma e Peito usam o mesmo arquivo para L e R)
-    let bufferKey = (type === 'Palma' || type === 'Peito') ? type : `${type}_${side}`;
+    // Identificar qual sample usar (Agora apenas a Palma usa o mesmo arquivo para L e R)
+    let bufferKey = type === 'Palma' ? type : `${type}_${side}`;
     let buffer = audioBuffers[bufferKey];
 
     if (buffer) {
