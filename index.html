@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Percussão Corporal - Sequenciador Iniciante</title>
+    <title>Percorporalizando - Sequenciador Iniciante</title>
     <!-- Favicon codificado em URL de forma segura -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👏%3C/text%3E%3C/svg%3E">
     
@@ -541,7 +541,7 @@ function playMetronome(time, beatIndex) {
     osc.start(time); osc.stop(time + 0.05);
 }
 
-// O CORE DO DAW: Matemática baseada em âncora fixa para não perder sincronismo
+// O CORE DO DAW: Relógio focado no áudio como mestre
 function nextNote() {
     const secondsPerStep = (60.0 / (state.bpm * state.speedMultiplier)) / 4; 
     state.currentStep++;
@@ -552,27 +552,34 @@ function nextNote() {
             // Avança a âncora fixa pelo tamanho exato do loop
             loopStartTime += (state.totalSteps * secondsPerStep);
             
-            // Sincroniza forçado no início de cada loop inteiro
-            if (bgMusicEnabled && !bgMusic.paused) {
-                bgMusic.currentTime = 0;
-            }
+            // Deixamos a música base loopear naturalmente pelo HTML5 Audio
+            // A música é o mestre, o sequenciador apenas a acompanha.
         } else {
             stopPlayback();
             return;
         }
     }
     
-    // Calcula o próximo tempo somando apenas os compassos em relação à âncora 
-    // Isso anula acúmulo de erros de ponto flutuante.
+    // Calcula o próximo tempo somando os compassos em relação à âncora
     nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
     
-    // A cada compasso (16 steps), forçar atualização do sincronismo da música de fundo (DOM vs DAW)
-    if (state.currentStep % 16 === 0 && state.currentStep !== 0) {
+    // SINCRONIZAÇÃO MASTER AUDIO:
+    // A cada compasso (16 steps), a DAW lê o relógio do áudio e ajusta SUAS PRÓPRIAS steps!
+    if (state.currentStep % 16 === 0) {
         if (bgMusicEnabled && !bgMusic.paused) {
+            const actualBgmTime = bgMusic.currentTime;
             const expectedBgmTime = state.currentStep * secondsPerStep;
-            // Se o DOM Audio (música) tiver mais de 50ms de diferença para a Web Audio API (Metrônomo), corrige ele:
-            if (Math.abs(bgMusic.currentTime - expectedBgmTime) > 0.05) {
-                bgMusic.currentTime = expectedBgmTime;
+            
+            // Diferença entre onde a música está e onde as steps acham que ela está
+            const drift = actualBgmTime - expectedBgmTime;
+            
+            // Ignoramos o drift se ele for gigante (ex: delay de loop natural do navegador de > 1 segundo)
+            // Caso contrário, nós nos corrigimos em relação à música mestre!
+            if (Math.abs(drift) > 0.02 && Math.abs(drift) < 1.0) {
+                // Deslocamos a âncora da DAW para compensar o drift do áudio base.
+                // Isso faz os próximos agendamentos ocorrerem milissegundos mais cedo ou mais tarde, travando na música.
+                loopStartTime -= drift;
+                nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
             }
         }
     }
@@ -613,14 +620,16 @@ function startPlayback() {
     targetBodyRotY = 0; 
     visualQueue = []; 
     
+    // Atraso inicial seguro para a Web Audio API respirar
     const startDelay = 0.05;
-    loopStartTime = audioCtx.currentTime + startDelay;
-    nextNoteTime = loopStartTime;
     
     if (bgMusicEnabled) {
         bgMusic.currentTime = 0;
         bgMusic.play().catch(e => console.log("Áudio bloqueado:", e));
     }
+
+    loopStartTime = audioCtx.currentTime + startDelay;
+    nextNoteTime = loopStartTime;
 
     document.getElementById('play-btn').textContent = '⏹ Stop';
     document.getElementById('play-btn').classList.add('playing');
