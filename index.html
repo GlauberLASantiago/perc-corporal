@@ -119,13 +119,17 @@
 
         /* --- ÁREA PRINCIPAL (MEIO) --- */
         #main-workspace {
-            display: flex;
+            display: none; /* Começa oculto */
             flex: 1 1 auto;
             height: auto;
             min-height: 200px;
             background: var(--ui-bg);
             border-top: 2px solid var(--ui-border);
             border-bottom: 2px solid var(--ui-border);
+        }
+        
+        #main-workspace.open {
+            display: flex;
         }
 
         /* Biblioteca Esquerda */
@@ -237,12 +241,12 @@
         button { padding: 8px 16px; border: none; border-radius: 6px; background: #eee; color: #333; font-weight: bold; cursor: pointer; }
         button:hover { background: #ddd; }
 
-        .upload-btn { padding: 8px 12px; border: none; border-radius: 6px; background: #9b59b6; color: white; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 0.85em; display: flex; align-items: center; justify-content: center; }
-        .upload-btn:hover { background: #8e44ad; }
-        #audio-upload { display: none; }
-        
         #play-btn { background: #27ae60; color: white; font-size: 1.1em; padding: 10px 24px; }
         #play-btn.playing { background: #e74c3c; }
+        
+        #toggle-sequencer-btn { background: #e67e22; color: white; }
+        #toggle-sequencer-btn:hover { background: #d35400; }
+
         input[type="range"] { width: 100px; }
         .bpm-display { min-width: 60px; font-variant-numeric: tabular-nums; }
 
@@ -271,7 +275,7 @@
         #footer-credits a:hover { text-decoration: underline; }
 
         @media (max-width: 768px) {
-            #main-workspace { flex-direction: column; }
+            #main-workspace.open { flex-direction: column; }
             #library { width: 100%; min-width: 100%; border-right: none; border-bottom: 2px solid var(--ui-border); max-height: 200px; }
             .step-group { display: flex; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; gap: 8px; }
             .step-btn { flex: 0 0 75px; }
@@ -349,13 +353,15 @@
     <div id="controls">
         <div class="control-group">
             <button id="play-btn">▶ Play</button>
+            <button id="toggle-sequencer-btn" title="Mostrar/Esconder a linha do tempo">🛠️ Abrir Sequenciador</button>
             <button id="clear-btn" title="Limpar Tudo">🗑️ Limpar</button>
         </div>
         
         <div class="control-group">
             <label>BPM:</label>
-            <input type="range" id="bpm-slider" min="40" max="180" value="90">
-            <span id="bpm-display" class="bpm-display">90</span>
+            <button id="bpm-down" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Diminuir BPM">-</button>
+            <input type="number" id="bpm-input" min="40" max="240" value="90" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
+            <button id="bpm-up" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Aumentar BPM">+</button>
             <label style="margin-left: 10px;">Velocidade:</label>
             <select id="speed-select">
                 <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
@@ -366,13 +372,6 @@
             <button id="turma-btn" style="background: #9b59b6; color:white;" title="Adicionar mais pessoas">👥 Turma: OFF</button>
             <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
             <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
-        </div>
-
-        <div class="control-group">
-            <button id="bgm-toggle" style="background: #27ae60; color:white; padding: 8px 12px; font-size: 0.85em;" title="Ligar/Desligar Música">🎵 Música</button>
-            <input type="range" id="bgm-volume" min="0" max="1" step="0.05" value="0.3" style="width: 70px;" title="Volume da Música">
-            <label for="audio-upload" class="upload-btn" title="Carregar MP3 do computador">📂 MP3</label>
-            <input type="file" id="audio-upload" accept="audio/*">
         </div>
 
         <div class="control-group">
@@ -457,11 +456,6 @@ const audioUrls = {
 
 const audioBuffers = {};
 
-let bgMusic = new Audio('https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/musica-demo-90bpm.mp3');
-bgMusic.loop = true;
-bgMusic.volume = 0.3;
-let bgMusicEnabled = true;
-
 async function loadAudioSample(key, url) {
     try {
         const response = await fetch(url);
@@ -541,7 +535,7 @@ function playMetronome(time, beatIndex) {
     osc.start(time); osc.stop(time + 0.05);
 }
 
-// O CORE DO DAW: Relógio focado no áudio como mestre
+// O CORE DO DAW: Relógio interno ancorado
 function nextNote() {
     const secondsPerStep = (60.0 / (state.bpm * state.speedMultiplier)) / 4; 
     state.currentStep++;
@@ -551,9 +545,6 @@ function nextNote() {
             state.currentStep = 0;
             // Avança a âncora fixa pelo tamanho exato do loop
             loopStartTime += (state.totalSteps * secondsPerStep);
-            
-            // Deixamos a música base loopear naturalmente pelo HTML5 Audio
-            // A música é o mestre, o sequenciador apenas a acompanha.
         } else {
             stopPlayback();
             return;
@@ -562,27 +553,6 @@ function nextNote() {
     
     // Calcula o próximo tempo somando os compassos em relação à âncora
     nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
-    
-    // SINCRONIZAÇÃO MASTER AUDIO:
-    // A cada compasso (16 steps), a DAW lê o relógio do áudio e ajusta SUAS PRÓPRIAS steps!
-    if (state.currentStep % 16 === 0) {
-        if (bgMusicEnabled && !bgMusic.paused) {
-            const actualBgmTime = bgMusic.currentTime;
-            const expectedBgmTime = state.currentStep * secondsPerStep;
-            
-            // Diferença entre onde a música está e onde as steps acham que ela está
-            const drift = actualBgmTime - expectedBgmTime;
-            
-            // Ignoramos o drift se ele for gigante (ex: delay de loop natural do navegador de > 1 segundo)
-            // Caso contrário, nós nos corrigimos em relação à música mestre!
-            if (Math.abs(drift) > 0.02 && Math.abs(drift) < 1.0) {
-                // Deslocamos a âncora da DAW para compensar o drift do áudio base.
-                // Isso faz os próximos agendamentos ocorrerem milissegundos mais cedo ou mais tarde, travando na música.
-                loopStartTime -= drift;
-                nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
-            }
-        }
-    }
 }
 
 // Função agendadora de antecipação visual e sonora
@@ -622,11 +592,6 @@ function startPlayback() {
     
     // Atraso inicial seguro para a Web Audio API respirar
     const startDelay = 0.05;
-    
-    if (bgMusicEnabled) {
-        bgMusic.currentTime = 0;
-        bgMusic.play().catch(e => console.log("Áudio bloqueado:", e));
-    }
 
     loopStartTime = audioCtx.currentTime + startDelay;
     nextNoteTime = loopStartTime;
@@ -640,9 +605,6 @@ function stopPlayback() {
     state.isPlaying = false; window.clearTimeout(timerID);
     targetBodyRotY = 0; 
     visualQueue = []; 
-    
-    bgMusic.pause();
-    bgMusic.currentTime = 0;
 
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
@@ -704,6 +666,19 @@ function initUI() {
         });
     });
 
+    const toggleSeqBtn = document.getElementById('toggle-sequencer-btn');
+    const workspace = document.getElementById('main-workspace');
+    toggleSeqBtn.addEventListener('click', () => {
+        workspace.classList.toggle('open');
+        if (workspace.classList.contains('open')) {
+            toggleSeqBtn.innerHTML = '🛠️ Fechar Sequenciador';
+        } else {
+            toggleSeqBtn.innerHTML = '🛠️ Abrir Sequenciador';
+        }
+        // Dispara um evento de redimensionamento para o palco 3D se ajustar ao novo espaço
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+    });
+
     document.getElementById('play-btn').addEventListener('click', togglePlayback);
     document.getElementById('clear-btn').addEventListener('click', () => {
         if(confirm("Limpar toda a sequência?")) {
@@ -712,11 +687,22 @@ function initUI() {
         }
     });
 
-    const bpmDisplay = document.getElementById('bpm-display');
-    document.getElementById('bpm-slider').addEventListener('input', (e) => { state.bpm = e.target.value; bpmDisplay.textContent = state.bpm; });
+    const bpmInput = document.getElementById('bpm-input');
+    const updateBpm = (val) => {
+        let newBpm = parseInt(val);
+        if (isNaN(newBpm)) newBpm = 90;
+        if (newBpm < 40) newBpm = 40;
+        if (newBpm > 240) newBpm = 240;
+        state.bpm = newBpm;
+        bpmInput.value = newBpm;
+    };
+    
+    bpmInput.addEventListener('change', (e) => updateBpm(e.target.value));
+    document.getElementById('bpm-down').addEventListener('click', () => updateBpm(state.bpm - 1));
+    document.getElementById('bpm-up').addEventListener('click', () => updateBpm(state.bpm + 1));
+
     document.getElementById('speed-select').addEventListener('change', (e) => { 
         state.speedMultiplier = parseFloat(e.target.value); 
-        bgMusic.playbackRate = state.speedMultiplier;
     });
 
     // Botão Modo Turma
@@ -747,28 +733,6 @@ function initUI() {
         loopBtn.textContent = state.loopOn ? '🔁 Loop: ON' : '➡️ Loop: OFF';
         loopBtn.style.background = state.loopOn ? '#27ae60' : '#ddd';
         loopBtn.style.color = state.loopOn ? 'white' : '#333';
-    });
-
-    const bgmToggle = document.getElementById('bgm-toggle');
-    bgmToggle.addEventListener('click', () => {
-        bgMusicEnabled = !bgMusicEnabled;
-        bgmToggle.style.background = bgMusicEnabled ? '#27ae60' : '#ddd';
-        bgmToggle.style.color = bgMusicEnabled ? 'white' : '#333';
-        if (!bgMusicEnabled && !bgMusic.paused) bgMusic.pause();
-        if (bgMusicEnabled && state.isPlaying) bgMusic.play();
-    });
-
-    const bgmVolume = document.getElementById('bgm-volume');
-    bgmVolume.addEventListener('input', (e) => { bgMusic.volume = e.target.value; });
-
-    const audioUpload = document.getElementById('audio-upload');
-    audioUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            bgMusic.src = url;
-            alert(`Áudio "${file.name}" carregado! Dica: Ajuste o BPM do sequenciador para sincronizar os passos com a sua música.`);
-        }
     });
 
     document.getElementById('toggle-glossary-btn').addEventListener('click', toggleGlossary);
@@ -837,7 +801,9 @@ function updatePlayheadUI(stepIndex) {
     document.querySelectorAll('.time-cell.playing').forEach(c => c.classList.remove('playing'));
     const activeCells = document.querySelectorAll(`.time-cell[data-col="${stepIndex}"]`);
     activeCells.forEach(c => c.classList.add('playing'));
-    if(activeCells.length > 0) {
+    
+    const workspace = document.getElementById('main-workspace');
+    if(activeCells.length > 0 && workspace.classList.contains('open')) {
         const wrapper = document.getElementById('timeline-wrapper');
         const rect = activeCells[0].getBoundingClientRect();
         const containerRect = wrapper.getBoundingClientRect();
@@ -1099,7 +1065,11 @@ function animate3D() {
 
     if (audioCtx && state.isPlaying) {
         let currTime = audioCtx.currentTime;
-        while (visualQueue.length > 0 && visualQueue[0].time <= currTime + 0.015) {
+        
+        // PRE-ROLL VISUAL DE 120ms (0.12s)
+        // O sistema agora avança a fila visual antes da hora para que o APICE 
+        // da animação do boneco case perfeitamente com a hora em que a nota soa.
+        while (visualQueue.length > 0 && visualQueue[0].time <= currTime + 0.12) {
             let evt = visualQueue.shift();
 
             if (evt.data.Pos) {
