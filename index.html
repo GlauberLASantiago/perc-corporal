@@ -8,7 +8,8 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.15.7/dist/soundfont-player.min.js"></script>
+    <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
 
     <style>
         :root {
@@ -378,7 +379,7 @@
             </select>
             <label style="margin-left: 10px;">BPM <span id="bpm-unit-label">(♩)</span>:</label>
             <button id="bpm-down" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Diminuir BPM">-</button>
-            <input type="number" id="bpm-input" min="40" max="240" value="60" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
+            <input type="number" id="bpm-input" min="40" max="240" value="75" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
             <button id="bpm-up" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Aumentar BPM">+</button>
             <label style="margin-left: 10px;">Velocidade:</label>
             <select id="speed-select">
@@ -424,7 +425,7 @@
 
 <script>
 const state = {
-    bpm: 60, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, pentatonicOn: false, turmaMode: false, turmaLayout: 'off',
+    bpm: 75, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, pentatonicOn: false, turmaMode: false, turmaLayout: 'off',
     meter: '4/4',
     totalSteps: 32, currentStep: 0,
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
@@ -623,21 +624,31 @@ const audioBuffers = {};
 const pentatonicState = {
     loading: false,
     ready: false,
-    mode: 'interno', // 'soundfont' quando carregar; 'interno' como fallback Web Audio
+    mode: 'interno', // 'webaudiofont', 'soundfont' ou 'interno'
+    player: null,
+    masterGain: null,
     instruments: {},
     bassPatternIndex: 0
 };
 
-const pentatonicInstruments = {
+const pentatonicMidiPrograms = {
+    bass: 32,   // Acoustic Bass — usado em pizzicato curto
+    piano: 4,   // Electric Piano 1 — usado para Pé
+    marimba: 12, // Marimba
+    flute: 4,   // Electric Piano 1 — usado para Palma/Peito
+    glock: 9    // Glockenspiel
+};
+
+const pentatonicSoundfontNames = {
     bass: 'acoustic_bass',
-    piano: 'acoustic_grand_piano',
-    cello: 'cello',
-    flute: 'flute',
+    piano: 'electric_piano_1',
+    marimba: 'electric_piano_1',
+    flute: 'marimba',
     glock: 'glockenspiel'
 };
 
 const pentatonicPools = {
-    bass: ['F2', 'F3', 'G2', 'C2', 'C1', 'F1'],
+    bass: ['F1', 'F2', 'A1', 'G1', 'C2', 'F1', 'A1', 'G1', 'C2'],
     foot: ['D3', 'F3', 'G3', 'A3', 'C4', 'D4'],
     thigh: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'],
     flute: ['D5', 'F5', 'G5', 'A5', 'C6', 'D6'],
@@ -658,7 +669,8 @@ function updatePentatonicButton(loading = false) {
         btn.style.color = 'white';
         return;
     }
-    const modo = pentatonicState.ready ? (pentatonicState.mode === 'soundfont' ? 'SF' : 'INT') : '';
+    const labelMap = { webaudiofont: 'WAF', soundfont: 'SF', interno: 'INT' };
+    const modo = pentatonicState.ready ? labelMap[pentatonicState.mode] : '';
     btn.textContent = state.pentatonicOn ? `🎻 Ostinato: ON${modo ? ' · ' + modo : ''}` : '🎻 Ostinato: OFF';
     btn.style.background = state.pentatonicOn ? '#5d4037' : '#795548';
     btn.style.color = 'white';
@@ -669,38 +681,6 @@ function withTimeout(promise, ms) {
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     ]);
-}
-
-async function initPentatonicSoundfonts() {
-    initAudio();
-    if (pentatonicState.ready || pentatonicState.loading) return;
-
-    pentatonicState.loading = true;
-    updatePentatonicButton(true);
-
-    // Primeiro tenta usar SoundFont real. Se CDN, CORS, HTTPS ou rede falharem,
-    // ativa automaticamente um sintetizador interno Web Audio para nunca ficar mudo.
-    try {
-        if (typeof Soundfont !== 'undefined') {
-            const entries = await withTimeout(Promise.all(Object.entries(pentatonicInstruments).map(async ([key, instrumentName]) => {
-                const instrument = await Soundfont.instrument(audioCtx, instrumentName, { soundfont: 'MusyngKite' });
-                return [key, instrument];
-            })), 9000);
-            entries.forEach(([key, instrument]) => { pentatonicState.instruments[key] = instrument; });
-            pentatonicState.mode = 'soundfont';
-            pentatonicState.ready = true;
-        } else {
-            throw new Error('Soundfont Player indisponível');
-        }
-    } catch (err) {
-        console.warn('SoundFont indisponível; usando sintetizador interno do navegador:', err);
-        pentatonicState.instruments = {};
-        pentatonicState.mode = 'interno';
-        pentatonicState.ready = true;
-    } finally {
-        pentatonicState.loading = false;
-        updatePentatonicButton(false);
-    }
 }
 
 function noteNameToMidi(note) {
@@ -714,6 +694,101 @@ function noteNameToMidi(note) {
 
 function noteNameToFreq(note) {
     return 440 * Math.pow(2, (noteNameToMidi(note) - 69) / 12);
+}
+
+function padProgramNumber(programNumber) {
+    return String(programNumber).padStart(3, '0') + '0';
+}
+
+function webAudioFontVarName(programNumber) {
+    return `_tone_${padProgramNumber(programNumber)}_Chaos_sf2_file`;
+}
+
+function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[data-src-once="${src}"]`);
+        if (existing) {
+            if (existing.dataset.loaded === 'true') resolve();
+            else existing.addEventListener('load', resolve, { once: true });
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.dataset.srcOnce = src;
+        script.onload = () => { script.dataset.loaded = 'true'; resolve(); };
+        script.onerror = () => reject(new Error(`Falha ao carregar ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+async function initWebAudioFontInstruments() {
+    if (typeof WebAudioFontPlayer === 'undefined') {
+        throw new Error('WebAudioFontPlayer indisponível');
+    }
+
+    pentatonicState.player = new WebAudioFontPlayer();
+    pentatonicState.masterGain = audioCtx.createGain();
+    pentatonicState.masterGain.gain.value = 0.85;
+    pentatonicState.masterGain.connect(audioCtx.destination);
+
+    const entries = await Promise.all(Object.entries(pentatonicMidiPrograms).map(async ([key, program]) => {
+        const code = padProgramNumber(program);
+        const varName = webAudioFontVarName(program);
+        const url = `https://surikov.github.io/webaudiofontdata/sound/${code}_Chaos_sf2_file.js`;
+        await loadScriptOnce(url);
+        const preset = window[varName];
+        if (!preset) throw new Error(`Preset WebAudioFont não encontrado: ${varName}`);
+        pentatonicState.player.loader.decodeAfterLoading(audioCtx, varName);
+        return [key, preset];
+    }));
+
+    entries.forEach(([key, preset]) => { pentatonicState.instruments[key] = preset; });
+    pentatonicState.mode = 'webaudiofont';
+    pentatonicState.ready = true;
+}
+
+async function initSoundfontPlayerInstruments() {
+    if (typeof Soundfont === 'undefined') {
+        throw new Error('soundfont-player indisponível');
+    }
+    const entries = await Promise.all(Object.entries(pentatonicSoundfontNames).map(async ([key, instrumentName]) => {
+        const instrument = await Soundfont.instrument(audioCtx, instrumentName, { soundfont: 'MusyngKite' });
+        return [key, instrument];
+    }));
+    entries.forEach(([key, instrument]) => { pentatonicState.instruments[key] = instrument; });
+    pentatonicState.mode = 'soundfont';
+    pentatonicState.ready = true;
+}
+
+async function initPentatonicSoundfonts() {
+    initAudio();
+    if (pentatonicState.ready || pentatonicState.loading) return;
+
+    pentatonicState.loading = true;
+    updatePentatonicButton(true);
+
+    try {
+        // Preferência: WebAudioFontPlayer + presets General MIDI do repositório Surikov.
+        await withTimeout(initWebAudioFontInstruments(), 12000);
+    } catch (wafErr) {
+        console.warn('WebAudioFont indisponível; tentando soundfont-player:', wafErr);
+        pentatonicState.instruments = {};
+        pentatonicState.player = null;
+        pentatonicState.masterGain = null;
+        try {
+            // Segundo caminho: soundfont-player 0.12.0 via jsDelivr.
+            await withTimeout(initSoundfontPlayerInstruments(), 10000);
+        } catch (sfErr) {
+            console.warn('SoundFont externo indisponível; usando sintetizador interno:', sfErr);
+            pentatonicState.instruments = {};
+            pentatonicState.mode = 'interno';
+            pentatonicState.ready = true;
+        }
+    } finally {
+        pentatonicState.loading = false;
+        updatePentatonicButton(false);
+    }
 }
 
 function createOutput(gainValue, time, duration, release = 0.08) {
@@ -763,29 +838,27 @@ function playSynthNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) 
         return;
     }
 
-    if (instrumentKey === 'piano') {
-        makeOsc('triangle', freq, 0.75);
-        makeOsc('sine', freq * 2, 0.22);
-        makeOsc('sine', freq * 3, 0.08);
+    if (instrumentKey === 'piano' || instrumentKey === 'flute') {
+        // Fallback interno de piano elétrico: ataque macio, harmônicos leves e decay curto.
+        makeOsc('sine', freq, 0.68);
+        makeOsc('triangle', freq * 2, 0.18);
+        makeOsc('sine', freq * 3, 0.07);
+        makeOsc('sine', freq * 0.5, 0.08);
         return;
     }
 
-    if (instrumentKey === 'cello') {
+    if (instrumentKey === 'marimba') {
         const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(900, t);
-        filter.Q.setValueAtTime(1.2, t);
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(freq * 2.2, t);
+        filter.Q.setValueAtTime(3.0, t);
         out.disconnect(); out.connect(filter); filter.connect(audioCtx.destination);
-        makeOsc('sawtooth', freq, 0.32, -4);
-        makeOsc('triangle', freq, 0.45, 3);
+        makeOsc('sine', freq, 0.62);
+        makeOsc('sine', freq * 2.01, 0.22);
+        makeOsc('triangle', freq * 3.0, 0.08);
         return;
     }
 
-    if (instrumentKey === 'flute') {
-        makeOsc('sine', freq, 0.8);
-        makeOsc('triangle', freq * 2, 0.12);
-        return;
-    }
 
     if (instrumentKey === 'glock') {
         makeOsc('sine', freq, 0.55);
@@ -800,18 +873,42 @@ function playSynthNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) 
 function playPentatonicNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) {
     if (!state.pentatonicOn || !pentatonicState.ready) return;
 
+    const safeTime = Math.max(time, audioCtx.currentTime + 0.003);
+
+    if (pentatonicState.mode === 'webaudiofont') {
+        const preset = pentatonicState.instruments[instrumentKey];
+        if (preset && pentatonicState.player) {
+            try {
+                const midiPitch = noteNameToMidi(note);
+                pentatonicState.player.queueWaveTable(
+                    audioCtx,
+                    pentatonicState.masterGain || audioCtx.destination,
+                    preset,
+                    safeTime,
+                    midiPitch,
+                    duration,
+                    gain
+                );
+                return;
+            } catch (err) {
+                console.warn('Erro ao tocar WebAudioFont; usando fallback interno:', instrumentKey, note, err);
+            }
+        }
+    }
+
     if (pentatonicState.mode === 'soundfont') {
         const instrument = pentatonicState.instruments[instrumentKey];
         if (instrument) {
             try {
-                instrument.play(note, Math.max(time, audioCtx.currentTime + 0.003), { duration, gain });
+                instrument.play(note, safeTime, { duration, gain });
                 return;
             } catch (err) {
-                console.warn('Erro ao tocar SoundFont; usando fallback interno:', instrumentKey, note, err);
+                console.warn('Erro ao tocar soundfont-player; usando fallback interno:', instrumentKey, note, err);
             }
         }
     }
-    playSynthNote(instrumentKey, note, time, duration, gain);
+
+    playSynthNote(instrumentKey, note, safeTime, duration, gain);
 }
 
 function schedulePentatonicLayer(stepNumber, time, stepData) {
@@ -822,7 +919,7 @@ function schedulePentatonicLayer(stepNumber, time, stepData) {
     if (stepNumber % cfg.pulseSteps === 0) {
         const note = pentatonicPools.bass[pentatonicState.bassPatternIndex % pentatonicPools.bass.length];
         pentatonicState.bassPatternIndex++;
-        playPentatonicNote('bass', note, time, 0.85, 0.42);
+        playPentatonicNote('bass', note, time, 0.85, 0.5);
     }
 
     const playedSharedGestures = new Set();
@@ -831,18 +928,17 @@ function schedulePentatonicLayer(stepNumber, time, stepData) {
         if (!type) return;
 
         if (type === 'Pé') {
-            playPentatonicNote('piano', choosePentatonicNote('foot'), time, 0.45, 0.32);
+            playPentatonicNote('piano', choosePentatonicNote('foot'), time, 0.45, 0.34);
         } else if (type === 'Coxa') {
-            playPentatonicNote('cello', choosePentatonicNote('thigh'), time, 0.55, 0.34);
+            playPentatonicNote('marimba', choosePentatonicNote('thigh'), time, 0.5, 0.38);
         } else if (type === 'Palma' || type === 'Peito') {
-            // Evita dobrar exatamente a mesma flauta quando as duas mãos fazem palma simultânea.
             const sharedKey = `${type}-${stepNumber}`;
             if (!playedSharedGestures.has(sharedKey)) {
                 playedSharedGestures.add(sharedKey);
-                playPentatonicNote('flute', choosePentatonicNote('flute'), time, 0.5, 0.28);
+                playPentatonicNote('flute', choosePentatonicNote('flute'), time, 0.5, 0.3);
             }
         } else if (type === 'Estalo') {
-            playPentatonicNote('glock', choosePentatonicNote('glock'), time, 0.35, 0.3);
+            playPentatonicNote('glock', choosePentatonicNote('glock'), time, 0.42, 0.34);
         }
     });
 }
