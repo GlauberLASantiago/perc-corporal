@@ -8,6 +8,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.15.7/dist/soundfont-player.min.js"></script>
 
     <style>
         :root {
@@ -162,6 +163,12 @@
         .step-btn.pos { color: #b08d00; border-left: 5px solid #ffd54f; }
         .step-btn.pos:hover, .step-btn.pos.selected { background-color: rgba(255, 213, 79, 0.15); border-color: #ffd54f; }
 
+        .step-btn.move { color: #6c3483; border-left: 5px solid #ba68c8; }
+        .step-btn.move:hover, .step-btn.move.selected { background-color: rgba(186, 104, 200, 0.15); border-color: #ba68c8; }
+        .move-grid { grid-template-columns: repeat(3, 1fr); }
+        .move-grid .step-btn { font-size: 1.05em; padding: 9px 5px; }
+        .move-grid .move-reset { background: #f4ecf7; }
+
         .step-btn.selected { box-shadow: 0 0 5px rgba(0,0,0,0.2); transform: scale(0.95); }
 
         #timeline-wrapper {
@@ -185,12 +192,17 @@
         }
         .timeline-header { font-size: 0.7em; color: #888; text-align: center; margin-bottom: 12px; }
         
-        .beat-marker { grid-column: span 4; border-left: 2px solid #ccc; padding-left: 4px; text-align: left; font-weight: bold; }
+        .beat-marker { border-left: 3px solid #7f8c8d; padding-left: 4px; text-align: left; font-weight: bold; min-height: 18px; }
+        .beat-marker.compound { border-left-color: #8e44ad; }
+        .time-cell.bar-line { border-left-width: 4px; border-left-color: #5d6d7e; }
+        .time-cell.pulse-line { border-left-width: 3px; border-left-color: #a0acb8; }
+        .time-cell.subpulse-line { border-left-width: 2px; border-left-color: #c6ccd2; }
 
         .row-label { font-weight: bold; font-size: 0.95em; text-align: right; padding-right: 12px; }
         .row-label.left { color: var(--left-color-dark); }
         .row-label.right { color: var(--right-color-dark); }
         .row-label.pos { color: #d4ac0d; font-size: 0.85em; }
+        .row-label.move { color: #8e44ad; font-size: 0.85em; }
 
         .time-cell {
             width: var(--cell-size);
@@ -206,11 +218,10 @@
             font-weight: bold;
             transition: all 0.1s;
         }
-        .time-cell:nth-child(4n + 2) { border-left-width: 3px; border-left-color: #a0acb8; }
-
         .time-cell.active-left { background-color: var(--left-color); color: white; border-color: var(--left-color-dark); }
         .time-cell.active-right { background-color: var(--right-color); color: white; border-color: var(--right-color-dark); }
         .time-cell.active-pos { background-color: #ffd54f; color: #333; border-color: #f39c12; }
+        .time-cell.active-move { background-color: #ba68c8; color: white; border-color: #8e44ad; }
 
         .time-cell.playing { box-shadow: 0 0 10px var(--active-glow); transform: scale(1.1); z-index: 10; border-color: gold; }
 
@@ -267,6 +278,8 @@
             #library { width: 100%; min-width: 100%; border-right: none; border-bottom: 2px solid var(--ui-border); max-height: 200px; }
             .step-group { display: flex; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; gap: 8px; }
             .step-btn { flex: 0 0 75px; }
+            .move-grid { display: grid; grid-template-columns: repeat(3, 1fr); overflow-x: visible; }
+            .move-grid .step-btn { flex: initial; }
             #stage-container { flex: 0 0 35vh; min-height: 35vh; }
             .timeline-header, .timeline-row { grid-template-columns: 40px repeat(32, 35px); }
             :root { --cell-size: 35px; }
@@ -322,6 +335,18 @@
                 <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Dir">➡️ Dir</div>
                 <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Trás">⬇️ Trás</div>
             </div>
+            <div class="library-title" style="margin-top: 15px;">Deslocamento</div>
+            <div class="step-group move-grid" aria-label="Rosa dos ventos para deslocamento">
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↖" title="Mover na diagonal frente-esquerda">↖</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↑" title="Mover para frente">↑</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↗" title="Mover na diagonal frente-direita">↗</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="←" title="Mover para a esquerda">←</div>
+                <div class="step-btn move move-reset" draggable="true" data-type="Move" data-val="X" title="Voltar à posição inicial">X</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="→" title="Mover para a direita">→</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↙" title="Mover na diagonal trás-esquerda">↙</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↓" title="Mover para trás">↓</div>
+                <div class="step-btn move" draggable="true" data-type="Move" data-val="↘" title="Mover na diagonal trás-direita">↘</div>
+            </div>
         </div>
 
         <div id="timeline-wrapper">
@@ -331,6 +356,7 @@
             </div>
             <div class="timeline-header" id="tl-header"><div></div></div>
             <div class="timeline-row" id="row-pos"><div class="row-label pos">GIRO</div></div>
+            <div class="timeline-row" id="row-move"><div class="row-label move">DESL</div></div>
             <div class="timeline-row" id="row-left"><div class="row-label left">ESQ</div></div>
             <div class="timeline-row" id="row-right"><div class="row-label right">DIR</div></div>
         </div>
@@ -343,9 +369,16 @@
         </div>
         
         <div class="control-group">
-            <label>BPM:</label>
+            <label>Compasso:</label>
+            <select id="meter-select" title="Escolher compasso">
+                <option value="2/4">2/4</option>
+                <option value="3/4">3/4</option>
+                <option value="4/4" selected>4/4</option>
+                <option value="6/8">6/8</option>
+            </select>
+            <label style="margin-left: 10px;">BPM <span id="bpm-unit-label">(♩)</span>:</label>
             <button id="bpm-down" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Diminuir BPM">-</button>
-            <input type="number" id="bpm-input" min="40" max="240" value="90" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
+            <input type="number" id="bpm-input" min="40" max="240" value="60" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
             <button id="bpm-up" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Aumentar BPM">+</button>
             <label style="margin-left: 10px;">Velocidade:</label>
             <select id="speed-select">
@@ -354,15 +387,18 @@
         </div>
 
         <div class="control-group">
-            <button id="turma-btn" style="background: #9b59b6; color:white;" title="Adicionar mais pessoas">👥 Turma: OFF</button>
+            <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
             <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
+            <button id="pentatonic-btn" style="background: #795548; color:white;" title="Gerador de ostinatos pentatônicos em Ré menor">🎻 Ostinato: OFF</button>
             <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
         </div>
 
         <div class="control-group">
             <button id="toggle-glossary-btn" style="background: #3498db; color:white;">📖 Ouvir Sons</button>
             <button id="presets-btn">🎓 Aprender (Ritmos)</button>
-            <button id="save-btn">💾 Salvar</button>
+            <button id="export-btn">📤 Exportar</button>
+            <button id="import-btn">📥 Importar</button>
+            <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
         </div>
     </div>
 
@@ -388,29 +424,178 @@
 
 <script>
 const state = {
-    bpm: 90, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, turmaMode: false,
+    bpm: 60, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, pentatonicOn: false, turmaMode: false, turmaLayout: 'off',
+    meter: '4/4',
     totalSteps: 32, currentStep: 0,
-    sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null })),
+    sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
     selectedTool: null, draggedData: null
 };
 
 let targetBodyRotY = 0;
+const moveStepSize = 14;
+const stageMoveBounds = { minX: -70, maxX: 70, minZ: -70, maxZ: 42 };
+const moveTargetOffset = new THREE.Vector3(0, 0, 0);
+const moveCurrentOffset = new THREE.Vector3(0, 0, 0);
+const movePreviousOffset = new THREE.Vector3(0, 0, 0);
+let walkClock = 0;
+let walkingIntensity = 0;
 let visualQueue = [];
 let loopStartTime = 0; 
 
 let presets = {
-    "1. Demonstração (Padrão)": [ 
-        {step: 0, f: 'Pos', t: 'Frente'}, {step: 0, f: 'L', t: 'Pé'}, {step: 2, f: 'R', t: 'Pé'}, 
-        {step: 4, f: 'L', t: 'Coxa'}, 
-        {step: 6, f: 'R', t: 'Coxa'}, {step: 6, f: 'L', t: 'Pé'},
-        {step: 7, f: 'Pos', t: 'Dir'}, {step: 7, f: 'L', t: 'Estalo'},
-        {step: 8, f: 'Pos', t: 'Frente'}, {step: 8, f: 'R', t: 'Coxa'}, {step: 8, f: 'L', t: 'Coxa'},
-        {step: 10, f: 'R', t: 'Palma'},
-        {step: 12, f: 'L', t: 'Peito'}, {step: 14, f: 'R', t: 'Peito'},
-        {step: 16, f: 'L', t: 'Estalo'}, {step: 18, f: 'R', t: 'Estalo'},
-        {step: 20, f: 'Pos', t: 'Esq'}
+    "1. Demonstração Bollywood — 4/4 com Pausas e Síncopas": [
+        // 4/4: dois compassos de 16 semicolcheias. Mais espaço, pausas e contratempos.
+        {step: 0,  f: 'Pos',  t: 'Frente'}, {step: 0,  f: 'Move', t: 'X'}, {step: 0, f: 'L', t: 'Pé'},
+        {step: 3,  f: 'R',    t: 'Estalo'},
+        {step: 5,  f: 'Move', t: '↗'},
+        {step: 6,  f: 'L',    t: 'Coxa'},
+        {step: 8,  f: 'R',    t: 'Pé'},
+        {step: 11, f: 'L',    t: 'Estalo'},
+        {step: 12, f: 'Pos',  t: 'Dir'}, {step: 12, f: 'Move', t: '←'}, {step: 12, f: 'L', t: 'Palma'}, {step: 12, f: 'R', t: 'Palma'},
+        {step: 15, f: 'R',    t: 'Coxa'},
+
+        {step: 16, f: 'Pos',  t: 'Frente'}, {step: 16, f: 'Move', t: '↙'}, {step: 16, f: 'L', t: 'Peito'},
+        {step: 19, f: 'R',    t: 'Peito'},
+        {step: 21, f: 'Move', t: '→'},
+        {step: 22, f: 'L',    t: 'Pé'},
+        {step: 24, f: 'Pos',  t: 'Esq'}, {step: 24, f: 'R', t: 'Pé'},
+        {step: 27, f: 'L',    t: 'Estalo'},
+        {step: 28, f: 'Move', t: 'X'},
+        {step: 30, f: 'L',    t: 'Palma'}, {step: 30, f: 'R', t: 'Palma'}
+    ],
+    "2. Demonstração 6/8 — Giga Medieval": [
+        // Giga medieval em 6/8: dois compassos, balanço ternário com acento nos pulsos 1 e 2
+        // de cada compasso (passos 0, 6, 12 e 18) e pequenas respostas nos contratempos.
+        {step: 0,  f: 'Pos',  t: 'Frente'}, {step: 0, f: 'Move', t: 'X'}, {step: 0, f: 'L', t: 'Pé'},
+        {step: 2,  f: 'R',    t: 'Estalo'},
+        {step: 4,  f: 'L',    t: 'Coxa'},
+        {step: 6,  f: 'Move', t: '↗'}, {step: 6, f: 'R', t: 'Pé'},
+        {step: 8,  f: 'L',    t: 'Estalo'},
+        {step: 10, f: 'L',    t: 'Palma'}, {step: 10, f: 'R', t: 'Palma'},
+
+        {step: 12, f: 'Pos',  t: 'Dir'}, {step: 12, f: 'Move', t: '←'}, {step: 12, f: 'L', t: 'Pé'},
+        {step: 14, f: 'R',    t: 'Coxa'},
+        {step: 16, f: 'R',    t: 'Estalo'},
+        {step: 18, f: 'Pos',  t: 'Frente'}, {step: 18, f: 'Move', t: '↙'}, {step: 18, f: 'R', t: 'Pé'},
+        {step: 20, f: 'L',    t: 'Peito'},
+        {step: 22, f: 'Move', t: 'X'}, {step: 22, f: 'L', t: 'Palma'}, {step: 22, f: 'R', t: 'Palma'}
+    ],
+    "3. Demonstração 3/4 — Valsa Percussiva": [
+        {step: 0,  f: 'Pos',  t: 'Frente'}, {step: 0, f: 'Move', t: 'X'}, {step: 0, f: 'L', t: 'Pé'},
+        {step: 3,  f: 'R',    t: 'Estalo'},
+        {step: 4,  f: 'R',    t: 'Coxa'},
+        {step: 7,  f: 'Move', t: '↗'},
+        {step: 8,  f: 'L',    t: 'Palma'}, {step: 8, f: 'R', t: 'Palma'},
+        {step: 11, f: 'L',    t: 'Estalo'},
+        {step: 12, f: 'Pos',  t: 'Dir'}, {step: 12, f: 'Move', t: '←'}, {step: 12, f: 'R', t: 'Pé'},
+        {step: 15, f: 'L',    t: 'Peito'},
+        {step: 16, f: 'R',    t: 'Peito'},
+        {step: 20, f: 'Move', t: 'X'}, {step: 20, f: 'L', t: 'Coxa'},
+        {step: 23, f: 'L',    t: 'Palma'}, {step: 23, f: 'R', t: 'Palma'}
+    ],
+    "4. Demonstração 2/4 — Curta e Sincopada": [
+        {step: 0,  f: 'Pos',  t: 'Frente'}, {step: 0, f: 'Move', t: 'X'}, {step: 0, f: 'L', t: 'Pé'},
+        {step: 2,  f: 'R',    t: 'Estalo'},
+        {step: 4,  f: 'Move', t: '→'}, {step: 4, f: 'R', t: 'Coxa'},
+        {step: 7,  f: 'L',    t: 'Palma'}, {step: 7, f: 'R', t: 'Palma'},
+        {step: 8,  f: 'Pos',  t: 'Esq'}, {step: 8, f: 'Move', t: '↖'}, {step: 8, f: 'L', t: 'Peito'},
+        {step: 11, f: 'R',    t: 'Peito'},
+        {step: 12, f: 'Move', t: 'X'}, {step: 12, f: 'R', t: 'Pé'},
+        {step: 15, f: 'L',    t: 'Estalo'}
     ]
 };
+
+
+const meterConfigs = {
+    '2/4': { totalSteps: 16, measureSteps: 8,  pulseSteps: 4, stepDivisor: 4, bpmUnit: '♩',  header: ['1', '2'] },
+    '3/4': { totalSteps: 24, measureSteps: 12, pulseSteps: 4, stepDivisor: 4, bpmUnit: '♩',  header: ['1', '2', '3'] },
+    '4/4': { totalSteps: 32, measureSteps: 16, pulseSteps: 4, stepDivisor: 4, bpmUnit: '♩',  header: ['1', '2', '3', '4'] },
+    '6/8': { totalSteps: 24, measureSteps: 12, pulseSteps: 6, stepDivisor: 6, bpmUnit: '♩.', header: ['1', '2'] }
+};
+
+function getMeterConfig() {
+    return meterConfigs[state.meter] || meterConfigs['4/4'];
+}
+
+function makeEmptySequence(length = state.totalSteps) {
+    return Array.from({ length }, () => ({ L: null, R: null, Pos: null, Move: null }));
+}
+
+function updateBpmUnitLabel() {
+    const label = document.getElementById('bpm-unit-label');
+    if (label) label.textContent = `(${getMeterConfig().bpmUnit})`;
+}
+
+function applyTimelineGridStyle() {
+    const template = `45px repeat(${state.totalSteps}, var(--cell-size))`;
+    document.querySelectorAll('.timeline-header, .timeline-row').forEach(row => {
+        row.style.gridTemplateColumns = template;
+    });
+}
+
+function clearTimelineCells() {
+    ['tl-header', 'row-pos', 'row-move', 'row-left', 'row-right'].forEach(id => {
+        const row = document.getElementById(id);
+        if (!row) return;
+        while (row.children.length > 1) row.removeChild(row.lastChild);
+    });
+}
+
+function buildTimeline() {
+    const header = document.getElementById('tl-header');
+    const rowPos = document.getElementById('row-pos');
+    const rowMove = document.getElementById('row-move');
+    const rowL = document.getElementById('row-left');
+    const rowR = document.getElementById('row-right');
+    const cfg = getMeterConfig();
+
+    clearTimelineCells();
+    applyTimelineGridStyle();
+
+    const measureCount = Math.ceil(state.totalSteps / cfg.measureSteps);
+    for (let m = 0; m < measureCount; m++) {
+        const mark = document.createElement('div');
+        mark.className = 'beat-marker' + (state.meter === '6/8' ? ' compound' : '');
+        mark.style.gridColumn = `span ${Math.min(cfg.measureSteps, state.totalSteps - (m * cfg.measureSteps))}`;
+        mark.textContent = state.meter === '6/8' ? `Compasso ${m + 1} · pulsos 1–2` : `Compasso ${m + 1}`;
+        header.appendChild(mark);
+    }
+
+    for (let i = 0; i < state.totalSteps; i++) {
+        [ {r: 'Pos', p: rowPos}, {r: 'Move', p: rowMove}, {r: 'L', p: rowL}, {r: 'R', p: rowR} ].forEach(cfgRow => {
+            const cell = document.createElement('div');
+            cell.className = 'time-cell';
+            if (i % cfg.measureSteps === 0) cell.classList.add('bar-line');
+            else if (i % cfg.pulseSteps === 0) cell.classList.add('pulse-line');
+            else if (state.meter === '6/8' && i % 3 === 0) cell.classList.add('subpulse-line');
+            cell.dataset.col = i;
+            cell.dataset.row = cfgRow.r;
+            setupCellEvents(cell);
+            cfgRow.p.appendChild(cell);
+        });
+    }
+    renderSequenceUI();
+}
+
+function setTimeSignature(meter, preserve = true) {
+    if (!meterConfigs[meter]) return;
+    if (state.isPlaying) stopPlayback();
+    const oldSequence = state.sequence || [];
+    state.meter = meter;
+    state.totalSteps = meterConfigs[meter].totalSteps;
+    state.currentStep = 0;
+    state.sequence = makeEmptySequence(state.totalSteps);
+    if (preserve) {
+        oldSequence.slice(0, state.totalSteps).forEach((step, index) => {
+            state.sequence[index] = Object.assign({ L: null, R: null, Pos: null, Move: null }, step);
+        });
+    }
+    const meterSelect = document.getElementById('meter-select');
+    if (meterSelect) meterSelect.value = meter;
+    updateBpmUnitLabel();
+    updatePentatonicButton(false);
+    buildTimeline();
+}
 
 // --- ÁUDIO ---
 let audioCtx = null;
@@ -432,6 +617,121 @@ const audioUrls = {
 };
 
 const audioBuffers = {};
+
+
+// --- GERADOR MELÓDICO PENTATÔNICO EM RÉ MENOR ---
+const pentatonicState = {
+    loading: false,
+    ready: false,
+    instruments: {},
+    bassPatternIndex: 0
+};
+
+const pentatonicInstruments = {
+    bass: 'acoustic_bass',
+    piano: 'acoustic_grand_piano',
+    cello: 'cello',
+    flute: 'flute',
+    glock: 'glockenspiel'
+};
+
+const pentatonicPools = {
+    bass: ['D2', 'A1', 'G1', 'D2', 'A1', 'G1'],
+    foot: ['D3', 'F3', 'G3', 'A3', 'C4', 'D4'],
+    thigh: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'],
+    flute: ['A4', 'C5'],
+    glock: ['D5', 'F5', 'G5', 'A5', 'C6', 'D6']
+};
+
+function choosePentatonicNote(poolName) {
+    const pool = pentatonicPools[poolName] || pentatonicPools.foot;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function updatePentatonicButton(loading = false) {
+    const btn = document.getElementById('pentatonic-btn');
+    if (!btn) return;
+    if (loading) {
+        btn.textContent = '🎻 Ostinato: carregando...';
+        btn.style.background = '#8d6e63';
+        btn.style.color = 'white';
+        return;
+    }
+    btn.textContent = state.pentatonicOn ? '🎻 Ostinato: ON' : '🎻 Ostinato: OFF';
+    btn.style.background = state.pentatonicOn ? '#5d4037' : '#795548';
+    btn.style.color = 'white';
+}
+
+async function initPentatonicSoundfonts() {
+    initAudio();
+    if (pentatonicState.ready || pentatonicState.loading) return;
+    if (typeof Soundfont === 'undefined') {
+        console.warn('Soundfont Player não foi carregado. O ostinato pentatônico ficará indisponível.');
+        return;
+    }
+
+    pentatonicState.loading = true;
+    updatePentatonicButton(true);
+    try {
+        const entries = await Promise.all(Object.entries(pentatonicInstruments).map(async ([key, instrumentName]) => {
+            const instrument = await Soundfont.instrument(audioCtx, instrumentName, { soundfont: 'MusyngKite' });
+            return [key, instrument];
+        }));
+        entries.forEach(([key, instrument]) => { pentatonicState.instruments[key] = instrument; });
+        pentatonicState.ready = true;
+    } catch (err) {
+        console.error('Erro ao carregar soundfonts do ostinato pentatônico:', err);
+        alert('Não foi possível carregar os soundfonts do ostinato. Verifique a conexão com a internet.');
+        state.pentatonicOn = false;
+    } finally {
+        pentatonicState.loading = false;
+        updatePentatonicButton(false);
+    }
+}
+
+function playSoundfontNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) {
+    if (!state.pentatonicOn || !pentatonicState.ready) return;
+    const instrument = pentatonicState.instruments[instrumentKey];
+    if (!instrument) return;
+    try {
+        instrument.play(note, time, { duration, gain });
+    } catch (err) {
+        console.warn('Erro ao tocar nota soundfont:', instrumentKey, note, err);
+    }
+}
+
+function schedulePentatonicLayer(stepNumber, time, stepData) {
+    if (!state.pentatonicOn || !pentatonicState.ready) return;
+    const cfg = getMeterConfig();
+
+    // Ostinato: no início de cada beat. Em 6/8, o beat é a semínima pontuada.
+    if (stepNumber % cfg.pulseSteps === 0) {
+        const note = pentatonicPools.bass[pentatonicState.bassPatternIndex % pentatonicPools.bass.length];
+        pentatonicState.bassPatternIndex++;
+        playSoundfontNote('bass', note, time, 0.85, 0.42);
+    }
+
+    const playedSharedGestures = new Set();
+    ['L', 'R'].forEach(side => {
+        const type = stepData[side];
+        if (!type) return;
+
+        if (type === 'Pé') {
+            playSoundfontNote('piano', choosePentatonicNote('foot'), time, 0.45, 0.32);
+        } else if (type === 'Coxa') {
+            playSoundfontNote('cello', choosePentatonicNote('thigh'), time, 0.55, 0.34);
+        } else if (type === 'Palma' || type === 'Peito') {
+            // Evita dobrar exatamente a mesma flauta quando as duas mãos fazem palma simultânea.
+            const sharedKey = `${type}-${stepNumber}`;
+            if (!playedSharedGestures.has(sharedKey)) {
+                playedSharedGestures.add(sharedKey);
+                playSoundfontNote('flute', choosePentatonicNote('flute'), time, 0.5, 0.28);
+            }
+        } else if (type === 'Estalo') {
+            playSoundfontNote('glock', choosePentatonicNote('glock'), time, 0.35, 0.3);
+        }
+    });
+}
 
 async function loadAudioSample(key, url) {
     try {
@@ -491,34 +791,40 @@ function playPercussionSound(time, side, type) {
 
 function playMetronome(time, beatIndex) {
     if (!audioCtx || !state.metronomeOn) return;
-    if (beatIndex % 4 !== 0) return;
+    const cfg = getMeterConfig();
+    if (beatIndex % cfg.pulseSteps !== 0) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.frequency.value = (beatIndex % 16 === 0) ? 1200 : 800; 
+    osc.frequency.value = (beatIndex % cfg.measureSteps === 0) ? 1200 : 800; 
     gain.gain.setValueAtTime(0.3, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
     osc.start(time); osc.stop(time + 0.05);
 }
 
+function secondsPerStep() {
+    return (60.0 / (state.bpm * state.speedMultiplier)) / getMeterConfig().stepDivisor;
+}
+
 function nextNote() {
-    const secondsPerStep = (60.0 / (state.bpm * state.speedMultiplier)) / 4; 
+    const secondsPerStepValue = secondsPerStep(); 
     state.currentStep++;
     if (state.currentStep >= state.totalSteps) {
         if(state.loopOn) {
             state.currentStep = 0;
-            loopStartTime += (state.totalSteps * secondsPerStep);
+            loopStartTime += (state.totalSteps * secondsPerStepValue);
         } else {
             stopPlayback();
             return;
         }
     }
-    nextNoteTime = loopStartTime + (state.currentStep * secondsPerStep);
+    nextNoteTime = loopStartTime + (state.currentStep * secondsPerStepValue);
 }
 
 function scheduleNote(stepNumber, time) {
     playMetronome(time, stepNumber);
     const stepData = state.sequence[stepNumber];
+    schedulePentatonicLayer(stepNumber, time, stepData);
     if (stepData.L) playPercussionSound(time, 'L', stepData.L);
     if (stepData.R) playPercussionSound(time, 'R', stepData.R);
     visualQueue.push({ step: stepNumber, time: time, data: stepData });
@@ -539,7 +845,13 @@ function togglePlayback() { initAudio(); state.isPlaying ? stopPlayback() : star
 function startPlayback() {
     state.isPlaying = true; 
     state.currentStep = 0;
-    targetBodyRotY = 0; 
+    targetBodyRotY = 0;
+    moveTargetOffset.set(0, 0, 0);
+    moveCurrentOffset.set(0, 0, 0);
+    movePreviousOffset.set(0, 0, 0);
+    walkClock = 0;
+    walkingIntensity = 0;
+    pentatonicState.bassPatternIndex = 0;
     visualQueue = []; 
     const startDelay = 0.05;
     loopStartTime = audioCtx.currentTime + startDelay;
@@ -551,7 +863,12 @@ function startPlayback() {
 
 function stopPlayback() {
     state.isPlaying = false; window.clearTimeout(timerID);
-    targetBodyRotY = 0; 
+    targetBodyRotY = 0;
+    moveTargetOffset.set(0, 0, 0);
+    moveCurrentOffset.set(0, 0, 0);
+    movePreviousOffset.set(0, 0, 0);
+    walkClock = 0;
+    walkingIntensity = 0;
     visualQueue = []; 
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
@@ -562,23 +879,7 @@ function stopPlayback() {
 
 // --- UI ---
 function initUI() {
-    const header = document.getElementById('tl-header');
-    const rowPos = document.getElementById('row-pos');
-    const rowL = document.getElementById('row-left');
-    const rowR = document.getElementById('row-right');
-
-    for (let i = 0; i < state.totalSteps; i++) {
-        if (i % 4 === 0) {
-            const beatMark = document.createElement('div');
-            beatMark.className = 'beat-marker'; beatMark.textContent = (i/4 + 1);
-            header.appendChild(beatMark);
-        }
-        [ {r: 'Pos', p: rowPos}, {r: 'L', p: rowL}, {r: 'R', p: rowR} ].forEach(cfg => {
-            const cell = document.createElement('div');
-            cell.className = 'time-cell'; cell.dataset.col = i; cell.dataset.row = cfg.r;
-            setupCellEvents(cell); cfg.p.appendChild(cell);
-        });
-    }
+    buildTimeline();
 
     document.querySelectorAll('.step-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -586,27 +887,33 @@ function initUI() {
             let isSameTool = false;
             if (state.selectedTool) {
                 if (btn.dataset.type === 'Pos') {
-                    isSameTool = (state.selectedTool.isPos && state.selectedTool.val === btn.dataset.val);
+                    isSameTool = (state.selectedTool.kind === 'Pos' && state.selectedTool.val === btn.dataset.val);
+                } else if (btn.dataset.type === 'Move') {
+                    isSameTool = (state.selectedTool.kind === 'Move' && state.selectedTool.val === btn.dataset.val);
                 } else {
-                    isSameTool = (!state.selectedTool.isPos && state.selectedTool.type === btn.dataset.type && state.selectedTool.foot === btn.dataset.foot);
+                    isSameTool = (state.selectedTool.kind === 'Body' && state.selectedTool.type === btn.dataset.type && state.selectedTool.foot === btn.dataset.foot);
                 }
             }
             if (isSameTool) { state.selectedTool = null; } 
             else {
                 btn.classList.add('selected');
                 if (btn.dataset.type === 'Pos') {
-                    state.selectedTool = { isPos: true, val: btn.dataset.val };
+                    state.selectedTool = { kind: 'Pos', isPos: true, val: btn.dataset.val };
+                } else if (btn.dataset.type === 'Move') {
+                    state.selectedTool = { kind: 'Move', isMove: true, val: btn.dataset.val };
                 } else {
-                    state.selectedTool = { isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
+                    state.selectedTool = { kind: 'Body', isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
                 }
             }
         });
 
         btn.addEventListener('dragstart', (e) => {
             if (btn.dataset.type === 'Pos') {
-                state.draggedData = { isPos: true, val: btn.dataset.val };
+                state.draggedData = { kind: 'Pos', isPos: true, val: btn.dataset.val };
+            } else if (btn.dataset.type === 'Move') {
+                state.draggedData = { kind: 'Move', isMove: true, val: btn.dataset.val };
             } else {
-                state.draggedData = { isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
+                state.draggedData = { kind: 'Body', isPos: false, foot: btn.dataset.foot, type: btn.dataset.type };
             }
             e.dataTransfer.setData('text/plain', JSON.stringify(state.draggedData));
             btn.click();
@@ -627,7 +934,7 @@ function initUI() {
 
     document.getElementById('play-btn').addEventListener('click', togglePlayback);
     document.getElementById('clear-btn').addEventListener('click', () => {
-        state.sequence = Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null }));
+        state.sequence = makeEmptySequence(state.totalSteps);
         renderSequenceUI();
     });
 
@@ -647,15 +954,14 @@ function initUI() {
     document.getElementById('speed-select').addEventListener('change', (e) => { 
         state.speedMultiplier = parseFloat(e.target.value); 
     });
+    document.getElementById('meter-select').addEventListener('change', (e) => {
+        setTimeSignature(e.target.value, true);
+    });
 
     const turmaBtn = document.getElementById('turma-btn');
     turmaBtn.addEventListener('click', () => {
-        state.turmaMode = !state.turmaMode;
-        turmaBtn.textContent = state.turmaMode ? '👥 Turma: ON' : '👥 Turma: OFF';
-        turmaBtn.style.background = state.turmaMode ? '#8e44ad' : '#9b59b6';
-        allAvatars.forEach(avatar => {
-            if (!avatar.isMain) avatar.group.visible = state.turmaMode;
-        });
+        const nextLayout = state.turmaLayout === 'off' ? 'fileiras' : (state.turmaLayout === 'fileiras' ? 'roda' : 'off');
+        setTurmaLayout(nextLayout);
     });
 
     const metroBtn = document.getElementById('metro-btn');
@@ -663,6 +969,13 @@ function initUI() {
         state.metronomeOn = !state.metronomeOn;
         metroBtn.textContent = state.metronomeOn ? '🔔 Metrônomo: ON' : '🔕 Metrônomo: OFF';
         metroBtn.style.background = state.metronomeOn ? '#ddd' : '#f9f9f9';
+    });
+
+    const pentatonicBtn = document.getElementById('pentatonic-btn');
+    pentatonicBtn.addEventListener('click', async () => {
+        state.pentatonicOn = !state.pentatonicOn;
+        updatePentatonicButton(false);
+        if (state.pentatonicOn) await initPentatonicSoundfonts();
     });
 
     const loopBtn = document.getElementById('loop-btn');
@@ -675,7 +988,9 @@ function initUI() {
 
     document.getElementById('toggle-glossary-btn').addEventListener('click', toggleGlossary);
     document.getElementById('presets-btn').addEventListener('click', showPresets);
-    document.getElementById('save-btn').addEventListener('click', showSaveMenu);
+    document.getElementById('export-btn').addEventListener('click', exportCurrentSequence);
+    document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-file').click());
+    document.getElementById('import-file').addEventListener('change', importSequenceFromFile);
     document.getElementById('modal-close').addEventListener('click', closeModal);
 }
 
@@ -683,10 +998,13 @@ function setupCellEvents(cell) {
     cell.addEventListener('click', () => {
         const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
         if (state.selectedTool) {
-            if (state.selectedTool.isPos && row === 'Pos') {
+            if (state.selectedTool.kind === 'Pos' && row === 'Pos') {
                 state.sequence[col][row] = state.sequence[col][row] === state.selectedTool.val ? null : state.selectedTool.val;
                 renderSequenceUI();
-            } else if (!state.selectedTool.isPos && (row === 'L' || row === 'R')) {
+            } else if (state.selectedTool.kind === 'Move' && row === 'Move') {
+                state.sequence[col][row] = state.sequence[col][row] === state.selectedTool.val ? null : state.selectedTool.val;
+                renderSequenceUI();
+            } else if (state.selectedTool.kind === 'Body' && (row === 'L' || row === 'R')) {
                 let targetRow = row;
                 if (state.sequence[col][targetRow] === state.selectedTool.type) { 
                     state.sequence[col][targetRow] = null; 
@@ -707,9 +1025,11 @@ function setupCellEvents(cell) {
     cell.addEventListener('drop', (e) => {
         e.preventDefault(); const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
         if (state.draggedData) {
-            if (state.draggedData.isPos && row === 'Pos') {
+            if (state.draggedData.kind === 'Pos' && row === 'Pos') {
                 state.sequence[col][row] = state.draggedData.val;
-            } else if (!state.draggedData.isPos && (row === 'L' || row === 'R')) {
+            } else if (state.draggedData.kind === 'Move' && row === 'Move') {
+                state.sequence[col][row] = state.draggedData.val;
+            } else if (state.draggedData.kind === 'Body' && (row === 'L' || row === 'R')) {
                 state.sequence[col][row] = state.draggedData.type;
             }
             renderSequenceUI();
@@ -721,11 +1041,14 @@ function renderSequenceUI() {
     document.querySelectorAll('.time-cell').forEach(cell => {
         const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
         const stepType = state.sequence[col][row];
-        cell.className = 'time-cell'; cell.textContent = '';
+        cell.classList.remove('active-pos', 'active-move', 'active-left', 'active-right', 'playing'); cell.textContent = '';
         if (stepType) {
             if (row === 'Pos') {
                 cell.classList.add('active-pos');
                 cell.textContent = stepType.substring(0, 3); 
+            } else if (row === 'Move') {
+                cell.classList.add('active-move');
+                cell.textContent = stepType;
             } else {
                 cell.classList.add(row === 'L' ? 'active-left' : 'active-right');
                 const abv = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es' };
@@ -747,6 +1070,38 @@ function updatePlayheadUI(stepIndex) {
         const containerRect = wrapper.getBoundingClientRect();
         document.getElementById('playhead').style.left = `${rect.left - containerRect.left + wrapper.scrollLeft + (rect.width/2)}px`;
     }
+}
+
+function applyMoveCommand(command) {
+    if (command === 'X') {
+        moveTargetOffset.set(0, 0, 0);
+        return;
+    }
+
+    const forward = new THREE.Vector3(Math.sin(targetBodyRotY), 0, Math.cos(targetBodyRotY));
+    const right = new THREE.Vector3(Math.cos(targetBodyRotY), 0, -Math.sin(targetBodyRotY));
+    const delta = new THREE.Vector3(0, 0, 0);
+
+    switch (command) {
+        case '↑': delta.copy(forward); break;
+        case '→': delta.copy(right); break;
+        case '↓': delta.copy(forward).multiplyScalar(-1); break;
+        case '←': delta.copy(right).multiplyScalar(-1); break;
+        case '↗': delta.copy(forward).add(right).normalize(); break;
+        case '↘': delta.copy(right).sub(forward).normalize(); break;
+        case '↙': delta.copy(forward).add(right).multiplyScalar(-1).normalize(); break;
+        case '↖': delta.copy(forward).sub(right).normalize(); break;
+        // Compatibilidade com sequências salvas na versão anterior do controle-relógio.
+        case '12': delta.copy(forward); break;
+        case '3':  delta.copy(right); break;
+        case '6':  delta.copy(forward).multiplyScalar(-1); break;
+        case '9':  delta.copy(right).multiplyScalar(-1); break;
+        default: return;
+    }
+
+    moveTargetOffset.add(delta.multiplyScalar(moveStepSize));
+    moveTargetOffset.x = Math.max(stageMoveBounds.minX, Math.min(stageMoveBounds.maxX, moveTargetOffset.x));
+    moveTargetOffset.z = Math.max(stageMoveBounds.minZ, Math.min(stageMoveBounds.maxZ, moveTargetOffset.z));
 }
 
 // --- 3D ---
@@ -832,6 +1187,15 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     const group = new THREE.Group();
     // Elevado 7 unidades para que o pé (base em y≈-5 local) fique rente ao chão
     group.position.set(x, 7, z);
+    group.userData.baseX = x;
+    group.userData.baseZ = z;
+    group.userData.baseRotY = 0;
+    group.userData.fileBaseX = x;
+    group.userData.fileBaseZ = z;
+    group.userData.fileBaseRotY = 0;
+    group.userData.circleBaseX = x;
+    group.userData.circleBaseZ = z;
+    group.userData.circleBaseRotY = 0;
     group.scale.set(scaleParam, scaleParam, scaleParam);
     
     const parts = {
@@ -971,26 +1335,108 @@ function initAvatars() {
     allAvatars = [];
     
     const mainAvatar = createSingleAvatar(true, 0, 0, 1.0, 0xffccaa, 0x34495e, 0x2c3e50);
+    mainAvatar.group.userData.fileBaseX = 0;
+    mainAvatar.group.userData.fileBaseZ = 0;
+    mainAvatar.group.userData.fileBaseRotY = 0;
     allAvatars.push(mainAvatar);
     scene.add(mainAvatar.group);
 
     const skinColors   = [0xffccaa, 0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x4d2a22, 0xffbfa3];
     const clothesColors = [0xe74c3c, 0x2ecc71, 0x9b59b6, 0xf1c40f, 0xe67e22, 0x1abc9c, 0x3498db, 0x95a5a6, 0xd35400, 0x27ae60];
 
-    const numClones = 10;
-    for (let i = 0; i < numClones; i++) {
-        const angle  = Math.PI + (Math.random() - 0.5) * Math.PI * 1.5; 
-        const radius = 60 + Math.random() * 90;
+    // Opção 1: turma em fileiras, com espaçamento fixo para evitar colisões.
+    const formationRows = [
+        { count: 6,  z: -52,  spacing: 30, scaleBase: 0.92 },
+        { count: 8,  z: -88,  spacing: 29, scaleBase: 0.88 },
+        { count: 10, z: -124, spacing: 28, scaleBase: 0.84 }
+    ];
+
+    formationRows.forEach((row, rowIndex) => {
+        const rowWidth = (row.count - 1) * row.spacing;
+        const stagger = (rowIndex % 2 === 0) ? 0 : row.spacing / 2;
+
+        for (let i = 0; i < row.count; i++) {
+            const x = (i * row.spacing) - (rowWidth / 2) + stagger;
+            const z = row.z;
+            const scale = row.scaleBase + (Math.random() * 0.08 - 0.04);
+            const skin  = skinColors[Math.floor(Math.random() * skinColors.length)];
+            const shirt = clothesColors[Math.floor(Math.random() * clothesColors.length)];
+            const pants = clothesColors[Math.floor(Math.random() * clothesColors.length)];
+            const clone = createSingleAvatar(false, x, z, scale, skin, shirt, pants);
+            clone.group.visible = false;
+            clone.group.userData.formationRow = rowIndex + 1;
+            clone.group.userData.formationCol = i + 1;
+            clone.group.userData.fileBaseX = x;
+            clone.group.userData.fileBaseZ = z;
+            clone.group.userData.fileBaseRotY = 0;
+            allAvatars.push(clone);
+            scene.add(clone.group);
+        }
+    });
+
+    assignCircleFormation();
+    setTurmaLayout('off');
+}
+
+function assignCircleFormation() {
+    const count = allAvatars.length;
+    const radius = 112;
+    // O avatar principal também fica na borda da roda. Começa no ponto frontal da roda.
+    const startAngle = Math.PI;
+
+    allAvatars.forEach((avatar, index) => {
+        const angle = startAngle + (index / count) * Math.PI * 2;
         const x = Math.sin(angle) * radius;
-        const z = Math.cos(angle) * radius - 10; 
-        const scale = 0.85 + Math.random() * 0.3; 
-        const skin  = skinColors[Math.floor(Math.random() * skinColors.length)];
-        const shirt = clothesColors[Math.floor(Math.random() * clothesColors.length)];
-        const pants = clothesColors[Math.floor(Math.random() * clothesColors.length)];
-        const clone = createSingleAvatar(false, x, z, scale, skin, shirt, pants);
-        clone.group.visible = false; 
-        allAvatars.push(clone);
-        scene.add(clone.group);
+        const z = Math.cos(angle) * radius;
+        avatar.group.userData.circleBaseX = x;
+        avatar.group.userData.circleBaseZ = z;
+        // O modelo em rotação 0 olha para +Z; esta fórmula aponta cada avatar para o centro da roda.
+        avatar.group.userData.circleBaseRotY = Math.atan2(-x, -z);
+    });
+}
+
+function applyAvatarBaseTransform(avatar, x, z, rotY) {
+    avatar.group.userData.baseX = x;
+    avatar.group.userData.baseZ = z;
+    avatar.group.userData.baseRotY = rotY;
+    avatar.group.position.x = x + moveCurrentOffset.x;
+    avatar.group.position.z = z + moveCurrentOffset.z;
+}
+
+function setTurmaLayout(layout) {
+    state.turmaLayout = layout;
+    state.turmaMode = layout !== 'off';
+
+    allAvatars.forEach(avatar => {
+        const g = avatar.group;
+        if (layout === 'roda') {
+            g.visible = true;
+            applyAvatarBaseTransform(avatar, g.userData.circleBaseX, g.userData.circleBaseZ, g.userData.circleBaseRotY);
+        } else {
+            g.visible = avatar.isMain || layout === 'fileiras';
+            applyAvatarBaseTransform(avatar, g.userData.fileBaseX, g.userData.fileBaseZ, g.userData.fileBaseRotY || 0);
+        }
+    });
+
+    updateTurmaButton();
+}
+
+function updateTurmaButton() {
+    const turmaBtn = document.getElementById('turma-btn');
+    if (!turmaBtn) return;
+
+    if (state.turmaLayout === 'fileiras') {
+        turmaBtn.textContent = '👥 Turma: Fileiras';
+        turmaBtn.style.background = '#8e44ad';
+        turmaBtn.style.color = 'white';
+    } else if (state.turmaLayout === 'roda') {
+        turmaBtn.textContent = '⭕ Turma: Roda';
+        turmaBtn.style.background = '#16a085';
+        turmaBtn.style.color = 'white';
+    } else {
+        turmaBtn.textContent = '👥 Turma: OFF';
+        turmaBtn.style.background = '#9b59b6';
+        turmaBtn.style.color = 'white';
     }
 }
 
@@ -1065,6 +1511,8 @@ function animate3D() {
                 }
             }
 
+            if (evt.data.Move) applyMoveCommand(evt.data.Move);
+
             if (evt.data.L) triggerAnimation('L', evt.data.L);
             if (evt.data.R) triggerAnimation('R', evt.data.R);
 
@@ -1072,11 +1520,30 @@ function animate3D() {
         }
     }
 
+    // Atualiza o deslocamento global uma única vez por frame.
+    // Antes, isso acontecia dentro do loop de avatares; com a turma ligada, cada clone
+    // fazia o lerp avançar mais uma vez e o movimento ficava inconsistente.
+    movePreviousOffset.copy(moveCurrentOffset);
+    moveCurrentOffset.lerp(moveTargetOffset, 0.08);
+
+    // A caminhada é calculada pela distância percorrida no frame. Assim, as pernas
+    // se movem somente quando o avatar realmente está se deslocando no chão.
+    const frameMoveDistance = moveCurrentOffset.distanceTo(movePreviousOffset);
+    const isWalking = frameMoveDistance > 0.015;
+    walkingIntensity += ((isWalking ? 1 : 0) - walkingIntensity) * 0.18;
+    if (walkingIntensity > 0.01) {
+        walkClock += Math.max(frameMoveDistance * 0.35, 0.055 * walkingIntensity);
+    }
+
     allAvatars.forEach(avatar => {
         if (!avatar.group.visible) return;
 
-        // Rotação do corpo
-        let diff = targetBodyRotY - avatar.group.rotation.y;
+        avatar.group.position.x = avatar.group.userData.baseX + moveCurrentOffset.x;
+        avatar.group.position.z = avatar.group.userData.baseZ + moveCurrentOffset.z;
+
+        // Rotação do corpo: no modo roda, cada pessoa mantém sua orientação-base para o centro.
+        const avatarTargetRotY = (avatar.group.userData.baseRotY || 0) + targetBodyRotY;
+        let diff = avatarTargetRotY - avatar.group.rotation.y;
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
         avatar.group.rotation.y += diff * 0.15;
 
@@ -1095,6 +1562,28 @@ function animate3D() {
             const armPivot  = avatar.parts[side].armPivot;
             const legPivot  = avatar.parts[side].legPivot;
             const shinPivot = avatar.parts[side].shinPivot;
+            const footMesh  = avatar.parts[side].meshes['Pé'];
+
+            // Caminhada automática durante o deslocamento.
+            // O balanço é alternado: quando uma perna vai à frente, a outra vai para trás.
+            const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
+            const phase = walkClock + clonePhaseOffset + (side === 'L' ? 0 : Math.PI);
+            const swing = Math.sin(phase) * 0.42 * walkingIntensity;
+            const kneeBend = Math.max(0, Math.sin(phase + Math.PI / 2)) * 0.42 * walkingIntensity;
+
+            if (!legPivot.userData.isAnimating) {
+                legPivot.rotation.x += ((legPivot.userData.restingRot.x + swing) - legPivot.rotation.x) * 0.35;
+            }
+            if (!shinPivot.userData.isAnimating) {
+                shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
+            }
+            if (footMesh) {
+                footMesh.rotation.x += ((-kneeBend * 0.45) - footMesh.rotation.x) * 0.35;
+            }
+            if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
+                armPivot.rotation.x += ((armPivot.userData.restingRot.x - swing * 0.45) - armPivot.rotation.x) * 0.25;
+                armPivot.rotation.z += (armPivot.userData.restingRot.z - armPivot.rotation.z) * 0.2;
+            }
 
             // Animação do braço
             if (armPivot.userData.isAnimating) {
@@ -1202,10 +1691,22 @@ function closeModal() {
     document.getElementById('modal-confirm').style.display = 'none'; 
 }
 
-function loadSequence(seqData) {
-    state.sequence = Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null })); 
-    seqData.forEach(item => { if(item.step >= 0 && item.step < 32) state.sequence[item.step][item.f] = item.t; });
+function loadSequence(seqData, meter = state.meter) {
+    if (meter && meter !== state.meter && meterConfigs[meter]) {
+        setTimeSignature(meter, false);
+    } else {
+        state.sequence = makeEmptySequence(state.totalSteps);
+    }
+    seqData.forEach(item => { if(item.step >= 0 && item.step < state.totalSteps) state.sequence[item.step][item.f] = item.t; });
     renderSequenceUI(); closeModal();
+}
+
+function inferPresetMeter(name) {
+    if (name.includes('2/4')) return '2/4';
+    if (name.includes('3/4')) return '3/4';
+    if (name.includes('4/4')) return '4/4';
+    if (name.includes('6/8')) return '6/8';
+    return state.meter;
 }
 
 function showPresets() {
@@ -1215,65 +1716,144 @@ function showPresets() {
     
     Object.keys(presets).forEach(name => {
         const li = document.createElement('li'); li.textContent = "▶ " + name;
-        li.onclick = () => loadSequence(presets[name]); list.appendChild(li);
+        li.onclick = () => loadSequence(presets[name], inferPresetMeter(name)); list.appendChild(li);
     });
 
-    const saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
-    if (Object.keys(saved).length > 0) {
-        list.appendChild(document.createElement('hr'));
-        const lbl = document.createElement('div'); lbl.innerHTML = "<b>Meus Ritmos:</b>"; list.appendChild(lbl);
-        Object.keys(saved).forEach(name => {
-            const li = document.createElement('li');
-            li.innerHTML = `⭐ ${name} <span style="float:right; color:red; font-size:12px;" onclick="deleteSaved(event, '${name}')">Excluir</span>`;
-            li.onclick = (e) => { if(e.target.tagName !== 'SPAN') loadSequence(saved[name]); };
-            list.appendChild(li);
-        });
-    }
+    const importHint = document.createElement('li');
+    importHint.style.color = '#666';
+    importHint.style.fontSize = '0.9em';
+    importHint.style.cursor = 'default';
+    importHint.innerHTML = '<b>Ritmos externos:</b> use o botão 📥 Importar para carregar arquivos .json exportados.';
+    list.appendChild(document.createElement('hr'));
+    list.appendChild(importHint);
     openModal();
 }
 
-window.deleteSaved = function(event, name) {
-    event.stopPropagation();
-    if(confirm(`Excluir '${name}'?`)) {
-        let saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
-        delete saved[name]; localStorage.setItem('bodyPercussionSeq', JSON.stringify(saved));
-        showPresets(); 
-    }
+function sequenceToExportArray() {
+    const dataToExport = [];
+    state.sequence.forEach((step, index) => {
+        if(step.Pos)  dataToExport.push({step: index, f: 'Pos',  t: step.Pos});
+        if(step.Move) dataToExport.push({step: index, f: 'Move', t: step.Move});
+        if(step.L)    dataToExport.push({step: index, f: 'L',    t: step.L});
+        if(step.R)    dataToExport.push({step: index, f: 'R',    t: step.R});
+    });
+    return dataToExport;
 }
 
-function showSaveMenu() {
-    document.getElementById('modal-title').textContent = "Salvar Ritmo";
-    document.getElementById('modal-list').innerHTML = '';
-    document.getElementById('save-input-area').style.display = 'block';
-    const btn = document.getElementById('modal-confirm');
-    btn.style.display = 'block';
-    const input = document.getElementById('save-name');
-    input.value = ''; input.focus();
-    btn.onclick = () => {
-        const name = input.value.trim();
-        if(!name) { alert("Digite um nome!"); return; }
-        const dataToSave = [];
-        state.sequence.forEach((step, index) => {
-            if(step.Pos) dataToSave.push({step: index, f: 'Pos', t: step.Pos});
-            if(step.L)   dataToSave.push({step: index, f: 'L',   t: step.L});
-            if(step.R)   dataToSave.push({step: index, f: 'R',   t: step.R});
-        });
-        if(dataToSave.length === 0) { alert("A sequência está vazia!"); return; }
-        let saved = JSON.parse(localStorage.getItem('bodyPercussionSeq') || '{}');
-        saved[name] = dataToSave;
-        localStorage.setItem('bodyPercussionSeq', JSON.stringify(saved));
-        alert("Salvo com sucesso!"); closeModal();
+function sanitizeFileName(name) {
+    return (name || 'ritmo-percorporalizando')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9-_]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'ritmo-percorporalizando';
+}
+
+function exportCurrentSequence() {
+    const seqData = sequenceToExportArray();
+    if(seqData.length === 0) { alert("A sequência está vazia!"); return; }
+
+    const defaultName = `ritmo-${new Date().toISOString().slice(0, 10)}`;
+    const name = prompt("Nome do arquivo/ritmo:", defaultName);
+    if(name === null) return;
+    const cleanName = name.trim() || defaultName;
+
+    const payload = {
+        app: 'Percorporalizando',
+        formatVersion: 2,
+        name: cleanName,
+        exportedAt: new Date().toISOString(),
+        bpm: state.bpm,
+        speedMultiplier: state.speedMultiplier,
+        pentatonicOn: state.pentatonicOn,
+        meter: state.meter,
+        totalSteps: state.totalSteps,
+        sequence: seqData
     };
-    openModal();
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFileName(cleanName)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function normalizeImportedSequence(parsed) {
+    // Aceita o novo formato {sequence:[...]} e também arquivos antigos que contenham apenas um array.
+    const seq = Array.isArray(parsed) ? parsed : parsed.sequence;
+    if(!Array.isArray(seq)) throw new Error('Arquivo sem campo "sequence" válido.');
+
+    const allowedRows = new Set(['L', 'R', 'Pos', 'Move']);
+    const normalized = [];
+    seq.forEach(item => {
+        const step = Number(item.step);
+        if(!Number.isInteger(step) || step < 0 || step >= state.totalSteps) return;
+        if(!allowedRows.has(item.f)) return;
+        if(typeof item.t !== 'string' || item.t.length === 0) return;
+        normalized.push({ step, f: item.f, t: item.t });
+    });
+    return normalized;
+}
+
+function importSequenceFromFile(event) {
+    const input = event.target;
+    const file = input.files && input.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const parsed = JSON.parse(reader.result);
+            const importedMeter = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && meterConfigs[parsed.meter]) ? parsed.meter : state.meter;
+            if (importedMeter !== state.meter) setTimeSignature(importedMeter, false);
+            const seqData = normalizeImportedSequence(parsed);
+            if(seqData.length === 0) throw new Error('Arquivo sem eventos válidos na sequência.');
+
+            loadSequence(seqData, importedMeter);
+
+            if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                if(Number.isFinite(parsed.bpm)) {
+                    const bpmInput = document.getElementById('bpm-input');
+                    const importedBpm = Math.max(40, Math.min(240, Math.round(parsed.bpm)));
+                    state.bpm = importedBpm;
+                    if(bpmInput) bpmInput.value = importedBpm;
+                }
+                if(Number.isFinite(parsed.speedMultiplier)) {
+                    const speedSelect = document.getElementById('speed-select');
+                    state.speedMultiplier = parsed.speedMultiplier;
+                    if(speedSelect) speedSelect.value = String(parsed.speedMultiplier);
+                }
+                if(typeof parsed.pentatonicOn === 'boolean') {
+                    state.pentatonicOn = parsed.pentatonicOn;
+                    updatePentatonicButton(false);
+                    if(state.pentatonicOn) initPentatonicSoundfonts();
+                }
+            }
+
+            alert(`Ritmo importado: ${parsed.name || file.name}`);
+        } catch (err) {
+            alert(`Não foi possível importar este arquivo JSON. ${err.message}`);
+        } finally {
+            input.value = '';
+        }
+    };
+    reader.onerror = () => {
+        alert('Erro ao ler o arquivo selecionado.');
+        input.value = '';
+    };
+    reader.readAsText(file);
 }
 
 window.onload = () => {
     initThreeJS();
     initUI();
-    renderSequenceUI();
+    updateBpmUnitLabel();
 
     const demoKey = Object.keys(presets)[0];
-    if (demoKey) loadSequence(presets[demoKey]);
+    if (demoKey) loadSequence(presets[demoKey], inferPresetMeter(demoKey));
 
     fetch('padroes.js')
         .then(response => {
