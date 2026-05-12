@@ -390,14 +390,16 @@
         <div class="control-group">
             <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
             <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
-            <button id="pentatonic-btn" style="background: #795548; color:white;" title="Gerador de ostinatos pentatônicos em Ré menor">🎻 Ostinato: OFF</button>
+            <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Gerar melodia: OFF</button>
             <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
         </div>
 
         <div class="control-group">
             <button id="toggle-glossary-btn" style="background: #3498db; color:white;">📖 Ouvir Sons</button>
             <button id="presets-btn">🎓 Aprender (Ritmos)</button>
-            <button id="export-btn">📤 Exportar</button>
+            <button id="export-btn">📤 Exportar JSON</button>
+            <button id="export-midi-btn">🎼 Exportar MIDI</button>
+            <button id="export-image-btn">🖼️ Exportar imagem</button>
             <button id="import-btn">📥 Importar</button>
             <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
         </div>
@@ -425,7 +427,7 @@
 
 <script>
 const state = {
-    bpm: 75, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, pentatonicOn: false, turmaMode: false, turmaLayout: 'off',
+    bpm: 75, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, melodyOn: false, turmaMode: false, turmaLayout: 'off',
     meter: '4/4',
     totalSteps: 32, currentStep: 0,
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
@@ -594,7 +596,7 @@ function setTimeSignature(meter, preserve = true) {
     const meterSelect = document.getElementById('meter-select');
     if (meterSelect) meterSelect.value = meter;
     updateBpmUnitLabel();
-    updatePentatonicButton(false);
+    updateMelodyButton(false);
     buildTimeline();
 }
 
@@ -620,60 +622,130 @@ const audioUrls = {
 const audioBuffers = {};
 
 
-// --- GERADOR MELÓDICO PENTATÔNICO EM RÉ MENOR ---
-const pentatonicState = {
+// --- GERADOR DE MELODIA MONOFÔNICA PARA MARIMBA ---
+const melodyState = {
     loading: false,
     ready: false,
     mode: 'interno', // 'webaudiofont', 'soundfont' ou 'interno'
     player: null,
     masterGain: null,
-    instruments: {},
-    bassPatternIndex: 0
+    instrument: null,
+    noteIndex: 0
 };
 
-const pentatonicMidiPrograms = {
-    bass: 32,   // Acoustic Bass — usado em pizzicato curto
-    piano: 4,   // Electric Piano 1 — usado para Pé
-    marimba: 12, // Marimba
-    marimba: 4,   // Electric Piano 1 — usado para Palma/Peito
-    glock: 9    // Glockenspiel
+const melodyMidiProgram = 12; // General MIDI: Marimba
+const melodySoundfontName = 'marimba';
+
+// Escala pentatônica maior de Fá no intervalo C4-D5.
+// Fá maior pentatônica: F, G, A, C, D. Entre C4 e D5: C4, D4, F4, G4, A4, C5, D5.
+const melodyPool = ['C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5'];
+const melodyContour = [0, 1, 2, 4, 3, 5, 6, 5, 3, 2, 4, 1];
+
+
+// Mapeamento General MIDI de bateria/percussão no canal 10.
+// Cada parte do corpo vira uma peça diferente da bateria no MIDI exportado.
+const bodyPercussionMidiMap = {
+    'Pé': 36,      // Bass Drum 1
+    'Coxa': 45,    // Low Tom
+    'Peito': 41,   // Low Floor Tom
+    'Palma': 39,   // Hand Clap
+    'Estalo': 37   // Side Stick
+};
+const bodyPercussionNames = {
+    'Pé': 'Bumbo',
+    'Coxa': 'Tom grave',
+    'Peito': 'Surdo/tom de chão',
+    'Palma': 'Palmas',
+    'Estalo': 'Caixa lateral'
 };
 
-const pentatonicSoundfontNames = {
-    bass: 'acoustic_bass',
-    piano: 'electric_piano_1',
-    marimba: 'marimba',
-    glock: 'glockenspiel'
-};
-
-const pentatonicPools = {
-    bass: ['F1', 'F2', 'A1', 'G1', 'C2', 'F1', 'A1', 'G1', 'C2'],
-    foot: ['D3', 'F3', 'G3', 'A3', 'C4', 'D4'],
-    thigh: ['D4', 'F4', 'G4', 'A4', 'C5', 'D5'],
-    marimba: ['F4', 'G4', 'A4', 'Bb4', 'C5', 'D5'],
-    glock: ['D6', 'F6', 'G6', 'A6', 'C6', 'D7']
-};
-
-function choosePentatonicNote(poolName) {
-    const pool = pentatonicPools[poolName] || pentatonicPools.foot;
-    return pool[Math.floor(Math.random() * pool.length)];
+function getRhythmicWeight(stepData) {
+    let weight = 0;
+    if (stepData.L) weight++;
+    if (stepData.R) weight++;
+    return weight;
 }
 
-function updatePentatonicButton(loading = false) {
-    const btn = document.getElementById('pentatonic-btn');
+function hasBodyRhythm(stepData) {
+    return getRhythmicWeight(stepData) > 0;
+}
+
+function chooseMelodyNote(stepNumber, stepData) {
+    const cfg = getMeterConfig();
+    const contourIndex = (melodyState.noteIndex + Math.floor(stepNumber / Math.max(1, cfg.pulseSteps))) % melodyContour.length;
+    let noteIndex = melodyContour[contourIndex] % melodyPool.length;
+
+    // Pequena variação determinística: acentos com dois gestos simultâneos tendem à nota superior.
+    if (getRhythmicWeight(stepData) > 1) noteIndex = Math.min(melodyPool.length - 1, noteIndex + 1);
+    melodyState.noteIndex++;
+    return melodyPool[noteIndex];
+}
+
+function updateMelodyButton(loading = false) {
+    const btn = document.getElementById('melody-btn') || document.getElementById('pentatonic-btn');
     if (!btn) return;
     if (loading) {
-        btn.textContent = '🎻 Ostinato: carregando...';
+        btn.textContent = '🎵 Gerar melodia: carregando...';
         btn.style.background = '#8d6e63';
         btn.style.color = 'white';
         return;
     }
     const labelMap = { webaudiofont: 'WAF', soundfont: 'SF', interno: 'INT' };
-    const modo = pentatonicState.ready ? labelMap[pentatonicState.mode] : '';
-    btn.textContent = state.pentatonicOn ? `🎻 Ostinato: ON${modo ? ' · ' + modo : ''}` : '🎻 Ostinato: OFF';
-    btn.style.background = state.pentatonicOn ? '#5d4037' : '#795548';
+    const modo = melodyState.ready ? labelMap[melodyState.mode] : '';
+    btn.textContent = state.melodyOn ? `🎵 Gerar melodia: ON${modo ? ' · ' + modo : ''}` : '🎵 Gerar melodia: OFF';
+    btn.style.background = state.melodyOn ? '#5d4037' : '#795548';
     btn.style.color = 'white';
 }
+
+async function toggleMelodyMode() {
+    state.melodyOn = !state.melodyOn;
+
+    // O modo interno fica pronto imediatamente; isso evita que o botão pareça “travado”
+    // quando o navegador bloqueia ou demora para carregar soundfonts externos.
+    if (state.melodyOn && !melodyState.ready) {
+        melodyState.mode = 'interno';
+        melodyState.ready = true;
+        melodyState.loading = false;
+    }
+
+    updateMelodyButton(false);
+
+    if (state.melodyOn) {
+        try {
+            initAudio();
+            // Tenta melhorar o timbre em segundo plano, mas mantém o fallback interno ativo.
+            initMelodySoundfont().catch(err => {
+                console.warn('Melodia seguirá com timbre interno:', err);
+                melodyState.mode = 'interno';
+                melodyState.ready = true;
+                melodyState.loading = false;
+                updateMelodyButton(false);
+            });
+        } catch (err) {
+            console.warn('Não foi possível inicializar áudio externo; usando timbre interno:', err);
+            melodyState.mode = 'interno';
+            melodyState.ready = true;
+            melodyState.loading = false;
+            updateMelodyButton(false);
+        }
+    }
+}
+
+window.toggleMelodyMode = toggleMelodyMode;
+
+// Ligação de segurança: garante que o botão funcione mesmo se o initUI for alterado no futuro.
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('melody-btn') || document.getElementById('pentatonic-btn');
+    if (!btn || btn.dataset.listenerAttached === 'true') return;
+    btn.removeAttribute('onclick');
+    btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleMelodyMode();
+    });
+    btn.dataset.listenerAttached = 'true';
+    updateMelodyButton(false);
+});
 
 function withTimeout(promise, ms) {
     return Promise.race([
@@ -721,72 +793,61 @@ function loadScriptOnce(src) {
     });
 }
 
-async function initWebAudioFontInstruments() {
+async function initWebAudioFontMelodyInstrument() {
     if (typeof WebAudioFontPlayer === 'undefined') {
         throw new Error('WebAudioFontPlayer indisponível');
     }
+    melodyState.player = new WebAudioFontPlayer();
+    melodyState.masterGain = audioCtx.createGain();
+    melodyState.masterGain.gain.value = 0.85;
+    melodyState.masterGain.connect(audioCtx.destination);
 
-    pentatonicState.player = new WebAudioFontPlayer();
-    pentatonicState.masterGain = audioCtx.createGain();
-    pentatonicState.masterGain.gain.value = 0.85;
-    pentatonicState.masterGain.connect(audioCtx.destination);
-
-    const entries = await Promise.all(Object.entries(pentatonicMidiPrograms).map(async ([key, program]) => {
-        const code = padProgramNumber(program);
-        const varName = webAudioFontVarName(program);
-        const url = `https://surikov.github.io/webaudiofontdata/sound/${code}_Chaos_sf2_file.js`;
-        await loadScriptOnce(url);
-        const preset = window[varName];
-        if (!preset) throw new Error(`Preset WebAudioFont não encontrado: ${varName}`);
-        pentatonicState.player.loader.decodeAfterLoading(audioCtx, varName);
-        return [key, preset];
-    }));
-
-    entries.forEach(([key, preset]) => { pentatonicState.instruments[key] = preset; });
-    pentatonicState.mode = 'webaudiofont';
-    pentatonicState.ready = true;
+    const code = padProgramNumber(melodyMidiProgram);
+    const varName = webAudioFontVarName(melodyMidiProgram);
+    const url = `https://surikov.github.io/webaudiofontdata/sound/${code}_Chaos_sf2_file.js`;
+    await loadScriptOnce(url);
+    const preset = window[varName];
+    if (!preset) throw new Error(`Preset WebAudioFont não encontrado: ${varName}`);
+    melodyState.player.loader.decodeAfterLoading(audioCtx, varName);
+    melodyState.instrument = preset;
+    melodyState.mode = 'webaudiofont';
+    melodyState.ready = true;
 }
 
-async function initSoundfontPlayerInstruments() {
+async function initSoundfontMelodyInstrument() {
     if (typeof Soundfont === 'undefined') {
         throw new Error('soundfont-player indisponível');
     }
-    const entries = await Promise.all(Object.entries(pentatonicSoundfontNames).map(async ([key, instrumentName]) => {
-        const instrument = await Soundfont.instrument(audioCtx, instrumentName, { soundfont: 'MusyngKite' });
-        return [key, instrument];
-    }));
-    entries.forEach(([key, instrument]) => { pentatonicState.instruments[key] = instrument; });
-    pentatonicState.mode = 'soundfont';
-    pentatonicState.ready = true;
+    melodyState.instrument = await Soundfont.instrument(audioCtx, melodySoundfontName, { soundfont: 'MusyngKite' });
+    melodyState.mode = 'soundfont';
+    melodyState.ready = true;
 }
 
-async function initPentatonicSoundfonts() {
+async function initMelodySoundfont() {
     initAudio();
-    if (pentatonicState.ready || pentatonicState.loading) return;
+    if ((melodyState.ready && melodyState.mode !== 'interno') || melodyState.loading) return;
 
-    pentatonicState.loading = true;
-    updatePentatonicButton(true);
+    melodyState.loading = true;
+    if (!state.melodyOn) updateMelodyButton(true);
 
     try {
-        // Preferência: WebAudioFontPlayer + presets General MIDI do repositório Surikov.
-        await withTimeout(initWebAudioFontInstruments(), 12000);
+        await withTimeout(initWebAudioFontMelodyInstrument(), 12000);
     } catch (wafErr) {
         console.warn('WebAudioFont indisponível; tentando soundfont-player:', wafErr);
-        pentatonicState.instruments = {};
-        pentatonicState.player = null;
-        pentatonicState.masterGain = null;
+        melodyState.instrument = null;
+        melodyState.player = null;
+        melodyState.masterGain = null;
         try {
-            // Segundo caminho: soundfont-player 0.12.0 via jsDelivr.
-            await withTimeout(initSoundfontPlayerInstruments(), 10000);
+            await withTimeout(initSoundfontMelodyInstrument(), 10000);
         } catch (sfErr) {
-            console.warn('SoundFont externo indisponível; usando sintetizador interno:', sfErr);
-            pentatonicState.instruments = {};
-            pentatonicState.mode = 'interno';
-            pentatonicState.ready = true;
+            console.warn('SoundFont externo indisponível; usando sintetizador interno de marimba:', sfErr);
+            melodyState.instrument = null;
+            melodyState.mode = 'interno';
+            melodyState.ready = true;
         }
     } finally {
-        pentatonicState.loading = false;
-        updatePentatonicButton(false);
+        melodyState.loading = false;
+        updateMelodyButton(false);
     }
 }
 
@@ -800,146 +861,73 @@ function createOutput(gainValue, time, duration, release = 0.08) {
     return { gain, t };
 }
 
-function playSynthNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) {
+function playSynthMarimba(note, time, duration = 0.42, gain = 0.38) {
     if (!audioCtx) return;
     const freq = noteNameToFreq(note);
-    const { gain: out, t } = createOutput(gain, time, duration, instrumentKey === 'glock' ? 0.25 : 0.1);
+    const { gain: out, t } = createOutput(gain, time, duration, 0.18);
 
-    const makeOsc = (type, frequency, level = 1, detune = 0) => {
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(freq * 2.2, t);
+    filter.Q.setValueAtTime(3.0, t);
+    out.disconnect();
+    out.connect(filter);
+    filter.connect(audioCtx.destination);
+
+    const makeOsc = (type, frequency, level = 1) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(frequency, t);
-        osc.detune.setValueAtTime(detune, t);
         g.gain.setValueAtTime(level, t);
         osc.connect(g);
         g.connect(out);
         osc.start(t);
-        osc.stop(t + duration + 0.35);
-        return osc;
+        osc.stop(t + duration + 0.25);
     };
 
-    if (instrumentKey === 'bass') {
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(420, t);
-        filter.Q.setValueAtTime(2.5, t);
-        out.disconnect();
-        out.connect(filter);
-        filter.connect(audioCtx.destination);
-        const osc1 = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator();
-        osc1.type = 'triangle'; osc2.type = 'sine';
-        osc1.frequency.setValueAtTime(freq, t); osc2.frequency.setValueAtTime(freq * 0.5, t);
-        osc1.connect(out); osc2.connect(out);
-        osc1.start(t); osc2.start(t);
-        osc1.stop(t + duration + 0.2); osc2.stop(t + duration + 0.2);
-        return;
-    }
-
-    if (instrumentKey === 'piano' || instrumentKey === 'marimba') {
-        // Fallback interno de piano elétrico: ataque macio, harmônicos leves e decay curto.
-        makeOsc('sine', freq, 0.68);
-        makeOsc('triangle', freq * 2, 0.18);
-        makeOsc('sine', freq * 3, 0.07);
-        makeOsc('sine', freq * 0.5, 0.08);
-        return;
-    }
-
-    if (instrumentKey === 'marimba') {
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(freq * 2.2, t);
-        filter.Q.setValueAtTime(3.0, t);
-        out.disconnect(); out.connect(filter); filter.connect(audioCtx.destination);
-        makeOsc('sine', freq, 0.62);
-        makeOsc('sine', freq * 2.01, 0.22);
-        makeOsc('triangle', freq * 3.0, 0.08);
-        return;
-    }
-
-
-    if (instrumentKey === 'glock') {
-        makeOsc('sine', freq, 0.55);
-        makeOsc('sine', freq * 2.01, 0.35);
-        makeOsc('sine', freq * 3.02, 0.18);
-        return;
-    }
-
-    makeOsc('sine', freq, 1);
+    makeOsc('sine', freq, 0.72);
+    makeOsc('sine', freq * 2.01, 0.26);
+    makeOsc('triangle', freq * 3.0, 0.08);
 }
 
-function playPentatonicNote(instrumentKey, note, time, duration = 0.45, gain = 0.35) {
-    if (!state.pentatonicOn || !pentatonicState.ready) return;
-
+function playMelodyNote(note, time, duration = 0.42, gain = 0.38) {
+    if (!state.melodyOn || !melodyState.ready) return;
     const safeTime = Math.max(time, audioCtx.currentTime + 0.003);
 
-    if (pentatonicState.mode === 'webaudiofont') {
-        const preset = pentatonicState.instruments[instrumentKey];
-        if (preset && pentatonicState.player) {
-            try {
-                const midiPitch = noteNameToMidi(note);
-                pentatonicState.player.queueWaveTable(
-                    audioCtx,
-                    pentatonicState.masterGain || audioCtx.destination,
-                    preset,
-                    safeTime,
-                    midiPitch,
-                    duration,
-                    gain
-                );
-                return;
-            } catch (err) {
-                console.warn('Erro ao tocar WebAudioFont; usando fallback interno:', instrumentKey, note, err);
-            }
+    if (melodyState.mode === 'webaudiofont' && melodyState.instrument && melodyState.player) {
+        try {
+            melodyState.player.queueWaveTable(
+                audioCtx,
+                melodyState.masterGain || audioCtx.destination,
+                melodyState.instrument,
+                safeTime,
+                noteNameToMidi(note),
+                duration,
+                gain
+            );
+            return;
+        } catch (err) {
+            console.warn('Erro ao tocar marimba WebAudioFont; usando fallback interno:', note, err);
         }
     }
 
-    if (pentatonicState.mode === 'soundfont') {
-        const instrument = pentatonicState.instruments[instrumentKey];
-        if (instrument) {
-            try {
-                instrument.play(note, safeTime, { duration, gain });
-                return;
-            } catch (err) {
-                console.warn('Erro ao tocar soundfont-player; usando fallback interno:', instrumentKey, note, err);
-            }
+    if (melodyState.mode === 'soundfont' && melodyState.instrument) {
+        try {
+            melodyState.instrument.play(note, safeTime, { duration, gain });
+            return;
+        } catch (err) {
+            console.warn('Erro ao tocar marimba soundfont-player; usando fallback interno:', note, err);
         }
     }
 
-    playSynthNote(instrumentKey, note, safeTime, duration, gain);
+    playSynthMarimba(note, safeTime, duration, gain);
 }
 
-function schedulePentatonicLayer(stepNumber, time, stepData) {
-    if (!state.pentatonicOn || !pentatonicState.ready) return;
-    const cfg = getMeterConfig();
-
-    // Ostinato: no início de cada beat. Em 6/8, o beat é a semínima pontuada.
-    if (stepNumber % cfg.pulseSteps === 0) {
-        const note = pentatonicPools.bass[pentatonicState.bassPatternIndex % pentatonicPools.bass.length];
-        pentatonicState.bassPatternIndex++;
-        playPentatonicNote('bass', note, time, 0.85, 0.5);
-    }
-
-    const playedSharedGestures = new Set();
-    ['L', 'R'].forEach(side => {
-        const type = stepData[side];
-        if (!type) return;
-
-        if (type === 'Pé') {
-            playPentatonicNote('piano', choosePentatonicNote('foot'), time, 0.45, 0.34);
-        } else if (type === 'Coxa') {
-            playPentatonicNote('marimba', choosePentatonicNote('thigh'), time, 0.5, 0.38);
-        } else if (type === 'Palma' || type === 'Peito') {
-            const sharedKey = `${type}-${stepNumber}`;
-            if (!playedSharedGestures.has(sharedKey)) {
-                playedSharedGestures.add(sharedKey);
-                playPentatonicNote('marimba', choosePentatonicNote('marimba'), time, 0.5, 0.3);
-            }
-        } else if (type === 'Estalo') {
-            playPentatonicNote('glock', choosePentatonicNote('glock'), time, 0.42, 0.34);
-        }
-    });
+function scheduleMelodyLayer(stepNumber, time, stepData) {
+    if (!state.melodyOn || !melodyState.ready || !hasBodyRhythm(stepData)) return;
+    const note = chooseMelodyNote(stepNumber, stepData);
+    playMelodyNote(note, time, Math.min(0.52, secondsPerStep() * 0.92), 0.42);
 }
 
 async function loadAudioSample(key, url) {
@@ -1031,11 +1019,15 @@ function nextNote() {
 }
 
 function scheduleNote(stepNumber, time) {
-    playMetronome(time, stepNumber);
     const stepData = state.sequence[stepNumber];
-    schedulePentatonicLayer(stepNumber, time, stepData);
+
+    // A melodia é uma camada adicional: deve soar junto com metrônomo e percussão corporal,
+    // não substituir os sons corporais.
+    playMetronome(time, stepNumber);
     if (stepData.L) playPercussionSound(time, 'L', stepData.L);
     if (stepData.R) playPercussionSound(time, 'R', stepData.R);
+    if (state.melodyOn) scheduleMelodyLayer(stepNumber, time, stepData);
+
     visualQueue.push({ step: stepNumber, time: time, data: stepData });
 }
 
@@ -1060,7 +1052,7 @@ function startPlayback() {
     movePreviousOffset.set(0, 0, 0);
     walkClock = 0;
     walkingIntensity = 0;
-    pentatonicState.bassPatternIndex = 0;
+    melodyState.noteIndex = 0;
     visualQueue = []; 
     const startDelay = 0.05;
     loopStartTime = audioCtx.currentTime + startDelay;
@@ -1180,12 +1172,19 @@ function initUI() {
         metroBtn.style.background = state.metronomeOn ? '#ddd' : '#f9f9f9';
     });
 
-    const pentatonicBtn = document.getElementById('pentatonic-btn');
-    pentatonicBtn.addEventListener('click', async () => {
-        state.pentatonicOn = !state.pentatonicOn;
-        updatePentatonicButton(false);
-        if (state.pentatonicOn) await initPentatonicSoundfonts();
-    });
+    const melodyBtn = document.getElementById('melody-btn') || document.getElementById('pentatonic-btn');
+    if (melodyBtn) {
+        melodyBtn.removeAttribute('onclick');
+        if (melodyBtn.dataset.listenerAttached !== 'true') {
+            melodyBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleMelodyMode();
+            });
+            melodyBtn.dataset.listenerAttached = 'true';
+        }
+        updateMelodyButton(false);
+    }
 
     const loopBtn = document.getElementById('loop-btn');
     loopBtn.addEventListener('click', () => {
@@ -1198,6 +1197,8 @@ function initUI() {
     document.getElementById('toggle-glossary-btn').addEventListener('click', toggleGlossary);
     document.getElementById('presets-btn').addEventListener('click', showPresets);
     document.getElementById('export-btn').addEventListener('click', exportCurrentSequence);
+    document.getElementById('export-midi-btn').addEventListener('click', exportMidiSequence);
+    document.getElementById('export-image-btn').addEventListener('click', exportSequenceCertificateImage);
     document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-file').click());
     document.getElementById('import-file').addEventListener('change', importSequenceFromFile);
     document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -1972,8 +1973,10 @@ function exportCurrentSequence() {
         name: cleanName,
         exportedAt: new Date().toISOString(),
         bpm: state.bpm,
+        andamentoBpm: state.bpm,
+        compasso: state.meter,
         speedMultiplier: state.speedMultiplier,
-        pentatonicOn: state.pentatonicOn,
+        melodyOn: state.melodyOn,
         meter: state.meter,
         totalSteps: state.totalSteps,
         sequence: seqData
@@ -1988,6 +1991,259 @@ function exportCurrentSequence() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+
+function getMelodyEventsForExport() {
+    const oldIndex = melodyState.noteIndex;
+    melodyState.noteIndex = 0;
+    const events = [];
+    state.sequence.forEach((stepData, step) => {
+        if (!hasBodyRhythm(stepData)) return;
+        const note = chooseMelodyNote(step, stepData);
+        events.push({ step, note, midi: noteNameToMidi(note) });
+    });
+    melodyState.noteIndex = oldIndex;
+    return events;
+}
+
+function writeVarLen(value) {
+    let buffer = value & 0x7F;
+    const bytes = [];
+    while ((value >>= 7)) {
+        buffer <<= 8;
+        buffer |= ((value & 0x7F) | 0x80);
+    }
+    while (true) {
+        bytes.push(buffer & 0xFF);
+        if (buffer & 0x80) buffer >>= 8;
+        else break;
+    }
+    return bytes;
+}
+
+function pushTextMeta(track, delta, type, text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    track.push(...writeVarLen(delta), 0xFF, type, ...writeVarLen(bytes.length), ...bytes);
+}
+
+
+function getPercussionEventsForExport() {
+    const events = [];
+    state.sequence.forEach((stepData, step) => {
+        ['L', 'R'].forEach(side => {
+            const bodyPart = stepData[side];
+            if (!bodyPart || !bodyPercussionMidiMap[bodyPart]) return;
+            events.push({
+                step,
+                side,
+                bodyPart,
+                midi: bodyPercussionMidiMap[bodyPart],
+                velocity: side === 'L' ? 96 : 108
+            });
+        });
+    });
+    return events;
+}
+
+function makeMidiTrack(trackBytes) {
+    return [
+        0x4D,0x54,0x72,0x6B,
+        (trackBytes.length >> 24) & 0xFF,
+        (trackBytes.length >> 16) & 0xFF,
+        (trackBytes.length >> 8) & 0xFF,
+        trackBytes.length & 0xFF,
+        ...trackBytes
+    ];
+}
+
+function exportMidiSequence() {
+    const melodyEvents = getMelodyEventsForExport();
+    const percussionEvents = getPercussionEventsForExport();
+    if (melodyEvents.length === 0 && percussionEvents.length === 0) {
+        alert('A sequência não possui eventos rítmicos para exportar em MIDI.');
+        return;
+    }
+
+    const defaultName = `melodia-${new Date().toISOString().slice(0, 10)}`;
+    const name = prompt('Nome do arquivo MIDI:', defaultName);
+    if (name === null) return;
+    const cleanName = name.trim() || defaultName;
+
+    const ppq = 480;
+    const cfg = getMeterConfig();
+    const stepTicks = state.meter === '6/8' ? 120 : Math.round(ppq / cfg.stepDivisor);
+    const quarterBpm = state.meter === '6/8' ? state.bpm * 1.5 : state.bpm;
+    const mpqn = Math.round(60000000 / Math.max(1, quarterBpm));
+    const numerator = state.meter === '6/8' ? 6 : parseInt(state.meter.split('/')[0], 10);
+    const denominator = state.meter === '6/8' ? 8 : parseInt(state.meter.split('/')[1], 10);
+    const denomPow = Math.log2(denominator);
+
+    // Track 1: marimba melódica, canal 1.
+    const melodyTrack = [];
+    melodyTrack.push(0x00, 0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF);
+    melodyTrack.push(0x00, 0xFF, 0x58, 0x04, numerator, denomPow, 24, 8);
+    pushTextMeta(melodyTrack, 0, 0x03, 'Marimba - Gerar melodia');
+    pushTextMeta(melodyTrack, 0, 0x01, `Compasso: ${state.meter}; Andamento: ${state.bpm} BPM; Velocidade: ${Math.round(state.speedMultiplier * 100)}%; Tessitura: C4-D5`);
+    melodyTrack.push(0x00, 0xC0, melodyMidiProgram);
+
+    let melodyCurrentTick = 0;
+    const melodyNoteDuration = Math.max(30, Math.round(stepTicks * 0.86));
+    melodyEvents.forEach(ev => {
+        const startTick = ev.step * stepTicks;
+        const deltaToStart = Math.max(0, startTick - melodyCurrentTick);
+        melodyTrack.push(...writeVarLen(deltaToStart), 0x90, ev.midi, 92);
+        melodyTrack.push(...writeVarLen(melodyNoteDuration), 0x80, ev.midi, 0);
+        melodyCurrentTick = startTick + melodyNoteDuration;
+    });
+    melodyTrack.push(0x00, 0xFF, 0x2F, 0x00);
+
+    // Track 2: percussão corporal exportada como bateria General MIDI, canal 10.
+    const percussionTrack = [];
+    pushTextMeta(percussionTrack, 0, 0x03, 'Percussão corporal - Canal 10');
+    pushTextMeta(percussionTrack, 0, 0x01, 'Mapa: Pé=bumbo; Coxa=tom grave; Peito=surdo/tom de chão; Palma=palmas; Estalo=caixa lateral');
+
+    let percussionCurrentTick = 0;
+    const percussionNoteDuration = Math.max(24, Math.round(stepTicks * 0.52));
+    percussionEvents
+        .sort((a, b) => (a.step - b.step) || (a.midi - b.midi) || a.side.localeCompare(b.side))
+        .forEach(ev => {
+            const startTick = ev.step * stepTicks;
+            const deltaToStart = Math.max(0, startTick - percussionCurrentTick);
+            percussionTrack.push(...writeVarLen(deltaToStart), 0x99, ev.midi, ev.velocity); // canal 10: 0x99
+            percussionTrack.push(...writeVarLen(percussionNoteDuration), 0x89, ev.midi, 0);
+            percussionCurrentTick = startTick + percussionNoteDuration;
+        });
+    percussionTrack.push(0x00, 0xFF, 0x2F, 0x00);
+
+    const header = [
+        0x4D,0x54,0x68,0x64,
+        0x00,0x00,0x00,0x06,
+        0x00,0x01,             // formato 1: múltiplas trilhas sincronizadas
+        0x00,0x02,             // 2 trilhas: marimba + bateria/percussão
+        (ppq >> 8) & 0xFF, ppq & 0xFF
+    ];
+    const bytes = new Uint8Array([
+        ...header,
+        ...makeMidiTrack(melodyTrack),
+        ...makeMidiTrack(percussionTrack)
+    ]);
+
+    const blob = new Blob([bytes], { type: 'audio/midi' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFileName(cleanName)}.mid`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportSequenceCertificateImage() {
+    const seqData = sequenceToExportArray();
+    if (seqData.length === 0) { alert('A sequência está vazia!'); return; }
+
+    const studentName = prompt('Digite seu nome para aparecer no certificado:');
+    if (studentName === null) return;
+    const cleanStudentName = studentName.trim();
+    if (!cleanStudentName) { alert('Digite um nome válido.'); return; }
+
+    const now = new Date();
+    const dateText = now.toLocaleDateString('pt-BR');
+    const timeText = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const cfg = getMeterConfig();
+    const width = 1600;
+    const height = 1050;
+    const margin = 90;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#fffaf0';
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = '#795548';
+    ctx.lineWidth = 12;
+    ctx.strokeRect(35, 35, width - 70, height - 70);
+    ctx.strokeStyle = '#d7b98e';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(58, 58, width - 116, height - 116);
+
+    ctx.fillStyle = '#2c3e50';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 52px Segoe UI, Arial, sans-serif';
+    ctx.fillText('Percorporalizando', width / 2, 130);
+    ctx.font = 'bold 38px Segoe UI, Arial, sans-serif';
+    ctx.fillText('Certificado de criação rítmica', width / 2, 190);
+
+    ctx.font = '26px Segoe UI, Arial, sans-serif';
+    ctx.fillText('Esta sequência rítmica foi criada por', width / 2, 255);
+    ctx.font = 'bold 48px Segoe UI, Arial, sans-serif';
+    ctx.fillText(cleanStudentName, width / 2, 320);
+    ctx.font = '24px Segoe UI, Arial, sans-serif';
+    ctx.fillText(`Data: ${dateText} • Hora: ${timeText} • Compasso: ${state.meter} • Andamento: ${state.bpm} BPM`, width / 2, 370);
+
+    const gridX = margin;
+    const gridY = 450;
+    const labelW = 110;
+    const gridW = width - margin * 2 - labelW;
+    const cellW = gridW / state.totalSteps;
+    const rowH = 72;
+    const rows = [
+        { key: 'Pos', label: 'GIRO', color: '#f9d65c' },
+        { key: 'Move', label: 'DESL', color: '#ba68c8' },
+        { key: 'L', label: 'ESQ', color: '#4db6ac' },
+        { key: 'R', label: 'DIR', color: '#ff8a65' }
+    ];
+
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
+    ctx.fillStyle = '#5d6d7e';
+    ctx.fillText('Sequência registrada', gridX, gridY - 32);
+
+    rows.forEach((row, r) => {
+        const y = gridY + r * rowH;
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(row.label, gridX + labelW - 18, y + 44);
+
+        for (let i = 0; i < state.totalSteps; i++) {
+            const x = gridX + labelW + i * cellW;
+            ctx.fillStyle = '#f4f6f8';
+            ctx.strokeStyle = (i % cfg.measureSteps === 0) ? '#5d6d7e' : ((i % cfg.pulseSteps === 0) ? '#a0acb8' : '#d1d8df');
+            ctx.lineWidth = (i % cfg.measureSteps === 0) ? 3 : 1;
+            ctx.fillRect(x, y, cellW - 2, rowH - 12);
+            ctx.strokeRect(x, y, cellW - 2, rowH - 12);
+
+            const val = state.sequence[i][row.key];
+            if (val) {
+                ctx.fillStyle = row.color;
+                ctx.fillRect(x + 3, y + 3, Math.max(3, cellW - 8), rowH - 18);
+                ctx.fillStyle = row.key === 'Pos' ? '#333' : '#fff';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+                const abv = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es', 'Frente': 'Fre', 'Trás': 'Trá' };
+                ctx.fillText(abv[val] || val, x + cellW / 2, y + 40);
+            }
+        }
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#795548';
+    ctx.font = '22px Segoe UI, Arial, sans-serif';
+    ctx.fillText('Gerado no aplicativo Percorporalizando para envio ao(à) professor(a).', width / 2, height - 125);
+    ctx.font = '18px Segoe UI, Arial, sans-serif';
+    ctx.fillText('Legenda: Pé, Cx=Coxa, Pt=Peito, Pl=Palma, Es=Estalo.', width / 2, height - 88);
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFileName('certificado-' + cleanStudentName)}-${now.toISOString().slice(0,10)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 function normalizeImportedSequence(parsed) {
@@ -2016,7 +2272,7 @@ function importSequenceFromFile(event) {
     reader.onload = () => {
         try {
             const parsed = JSON.parse(reader.result);
-            const importedMeter = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && meterConfigs[parsed.meter]) ? parsed.meter : state.meter;
+            const importedMeter = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && meterConfigs[parsed.meter || parsed.compasso]) ? (parsed.meter || parsed.compasso) : state.meter;
             if (importedMeter !== state.meter) setTimeSignature(importedMeter, false);
             const seqData = normalizeImportedSequence(parsed);
             if(seqData.length === 0) throw new Error('Arquivo sem eventos válidos na sequência.');
@@ -2024,9 +2280,10 @@ function importSequenceFromFile(event) {
             loadSequence(seqData, importedMeter);
 
             if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                if(Number.isFinite(parsed.bpm)) {
+                const rawBpm = Number.isFinite(parsed.bpm) ? parsed.bpm : parsed.andamentoBpm;
+                if(Number.isFinite(rawBpm)) {
                     const bpmInput = document.getElementById('bpm-input');
-                    const importedBpm = Math.max(40, Math.min(240, Math.round(parsed.bpm)));
+                    const importedBpm = Math.max(40, Math.min(240, Math.round(rawBpm)));
                     state.bpm = importedBpm;
                     if(bpmInput) bpmInput.value = importedBpm;
                 }
@@ -2035,10 +2292,17 @@ function importSequenceFromFile(event) {
                     state.speedMultiplier = parsed.speedMultiplier;
                     if(speedSelect) speedSelect.value = String(parsed.speedMultiplier);
                 }
-                if(typeof parsed.pentatonicOn === 'boolean') {
-                    state.pentatonicOn = parsed.pentatonicOn;
-                    updatePentatonicButton(false);
-                    if(state.pentatonicOn) initPentatonicSoundfonts();
+                if(typeof parsed.melodyOn === 'boolean') {
+                    state.melodyOn = parsed.melodyOn;
+                    if (state.melodyOn && !melodyState.ready) { melodyState.mode = 'interno'; melodyState.ready = true; }
+                    updateMelodyButton(false);
+                    if(state.melodyOn) initMelodySoundfont();
+                } else if(typeof parsed.pentatonicOn === 'boolean') {
+                    // Compatibilidade com arquivos JSON exportados por versões antigas.
+                    state.melodyOn = parsed.pentatonicOn;
+                    if (state.melodyOn && !melodyState.ready) { melodyState.mode = 'interno'; melodyState.ready = true; }
+                    updateMelodyButton(false);
+                    if(state.melodyOn) initMelodySoundfont();
                 }
             }
 
