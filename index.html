@@ -385,6 +385,10 @@
             <select id="speed-select">
                 <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
             </select>
+            <label style="margin-left: 10px;" title="Use quando o som em caixa/fone Bluetooth chega depois da animação. Atrasar o visual ajuda a alinhar imagem e áudio.">Atraso visual BT:</label>
+            <input type="range" id="visual-delay-slider" min="0" max="1000" step="10" value="0" title="Atraso do visual em milissegundos para compensar latência Bluetooth">
+            <input type="number" id="visual-delay-input" min="0" max="1000" step="10" value="0" title="Atraso do visual em milissegundos" style="width: 70px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
+            <span id="visual-delay-label" class="bpm-display" title="Atraso aplicado apenas ao visual">0 ms</span>
         </div>
 
         <div class="control-group">
@@ -427,7 +431,7 @@
 
 <script>
 const state = {
-    bpm: 75, speedMultiplier: 1.0, isPlaying: false, metronomeOn: true, loopOn: true, melodyOn: false, turmaMode: false, turmaLayout: 'off',
+    bpm: 75, speedMultiplier: 1.0, visualDelayMs: 0, isPlaying: false, metronomeOn: true, loopOn: true, melodyOn: false, turmaMode: false, turmaLayout: 'off',
     meter: '4/4',
     totalSteps: 32, currentStep: 0,
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
@@ -1003,6 +1007,24 @@ function secondsPerStep() {
     return (60.0 / (state.bpm * state.speedMultiplier)) / getMeterConfig().stepDivisor;
 }
 
+function getVisualDelaySeconds() {
+    return Math.max(0, Math.min(1000, Number(state.visualDelayMs) || 0)) / 1000;
+}
+
+function updateVisualDelayUI(value) {
+    let delayMs = parseInt(value, 10);
+    if (isNaN(delayMs)) delayMs = 0;
+    delayMs = Math.max(0, Math.min(1000, delayMs));
+    state.visualDelayMs = delayMs;
+
+    const slider = document.getElementById('visual-delay-slider');
+    const input = document.getElementById('visual-delay-input');
+    const label = document.getElementById('visual-delay-label');
+    if (slider) slider.value = delayMs;
+    if (input) input.value = delayMs;
+    if (label) label.textContent = `${delayMs} ms`;
+}
+
 function nextNote() {
     const secondsPerStepValue = secondsPerStep(); 
     state.currentStep++;
@@ -1155,6 +1177,13 @@ function initUI() {
     document.getElementById('speed-select').addEventListener('change', (e) => { 
         state.speedMultiplier = parseFloat(e.target.value); 
     });
+
+    const visualDelaySlider = document.getElementById('visual-delay-slider');
+    const visualDelayInput = document.getElementById('visual-delay-input');
+    if (visualDelaySlider) visualDelaySlider.addEventListener('input', (e) => updateVisualDelayUI(e.target.value));
+    if (visualDelayInput) visualDelayInput.addEventListener('change', (e) => updateVisualDelayUI(e.target.value));
+    updateVisualDelayUI(state.visualDelayMs);
+
     document.getElementById('meter-select').addEventListener('change', (e) => {
         setTimeSignature(e.target.value, true);
     });
@@ -1709,7 +1738,7 @@ function animate3D() {
 
     if (audioCtx && state.isPlaying) {
         let currTime = audioCtx.currentTime;
-        while (visualQueue.length > 0 && visualQueue[0].time <= currTime + 0.12) {
+        while (visualQueue.length > 0 && (visualQueue[0].time + getVisualDelaySeconds()) <= currTime + 0.005) {
             let evt = visualQueue.shift();
 
             if (evt.data.Pos) {
@@ -1976,6 +2005,7 @@ function exportCurrentSequence() {
         andamentoBpm: state.bpm,
         compasso: state.meter,
         speedMultiplier: state.speedMultiplier,
+        visualDelayMs: state.visualDelayMs,
         melodyOn: state.melodyOn,
         meter: state.meter,
         totalSteps: state.totalSteps,
@@ -2291,6 +2321,9 @@ function importSequenceFromFile(event) {
                     const speedSelect = document.getElementById('speed-select');
                     state.speedMultiplier = parsed.speedMultiplier;
                     if(speedSelect) speedSelect.value = String(parsed.speedMultiplier);
+                }
+                if(Number.isFinite(parsed.visualDelayMs)) {
+                    updateVisualDelayUI(parsed.visualDelayMs);
                 }
                 if(typeof parsed.melodyOn === 'boolean') {
                     state.melodyOn = parsed.melodyOn;
