@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -788,6 +789,31 @@ let scheduleAheadTime = 0.1;
 let lookahead = 25; 
 let timerID;
 
+let mainMixNode = null;
+let reverbNode = null;
+let reverbGain = null;
+let delayNode = null;
+let delayFeedback = null;
+let delayGain = null;
+
+function createReverbImpulseResponse(duration, decay) {
+    if (!audioCtx) return null;
+    const sampleRate = audioCtx.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = audioCtx.createBuffer(2, length, sampleRate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+
+    for (let i = 0; i < length; i++) {
+        const noiseL = Math.random() * 2 - 1;
+        const noiseR = Math.random() * 2 - 1;
+        const decayFactor = Math.pow(1 - i / length, decay);
+        left[i] = noiseL * decayFactor;
+        right[i] = noiseR * decayFactor;
+    }
+    return impulse;
+}
+
 const audioUrls = {
     'Pé_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-d.mp3',
     'Pé_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-e.mp3',
@@ -817,10 +843,10 @@ const melodyState = {
 const melodyMidiProgram = 12; // General MIDI: Marimba
 const melodySoundfontName = 'marimba';
 
-// Escala pentatônica maior de Dó no intervalo C4-C5 (uma oitava).
-// Dó maior pentatônica: C, D, E, G, A. Entre C4 e C5: C4, D4, E4, G4, A4, C5.
-const melodyPool = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5'];
-const melodyContour = [0, 1, 2, 4, 3, 5, 4, 3, 2, 1, 2, 0];
+// Escala pentatônica maior de Dó (sem o dó agudo).
+// Dó maior pentatônica: C4, D4, E4, G4, A4.
+const melodyPool = ['C4', 'D4', 'E4', 'G4', 'A4'];
+const melodyContour = [0, 1, 2, 4, 3, 0, 4, 3, 2, 1, 2, 0];
 
 
 // Mapeamento General MIDI de bateria/percussão no canal 10.
@@ -986,7 +1012,7 @@ async function initWebAudioFontMelodyInstrument() {
     melodyState.player = new WebAudioFontPlayer();
     melodyState.masterGain = audioCtx.createGain();
     melodyState.masterGain.gain.value = 0.85;
-    melodyState.masterGain.connect(audioCtx.destination);
+    melodyState.masterGain.connect(mainMixNode || audioCtx.destination);
 
     const code = padProgramNumber(melodyMidiProgram);
     const varName = webAudioFontVarName(melodyMidiProgram);
@@ -1004,7 +1030,10 @@ async function initSoundfontMelodyInstrument() {
     if (typeof Soundfont === 'undefined') {
         throw new Error('soundfont-player indisponível');
     }
-    melodyState.instrument = await Soundfont.instrument(audioCtx, melodySoundfontName, { soundfont: 'MusyngKite' });
+    melodyState.instrument = await Soundfont.instrument(audioCtx, melodySoundfontName, { 
+        soundfont: 'MusyngKite',
+        destination: mainMixNode || audioCtx.destination
+    });
     melodyState.mode = 'soundfont';
     melodyState.ready = true;
 }
@@ -1043,7 +1072,7 @@ function createOutput(gainValue, time, duration, release = 0.08) {
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.linearRampToValueAtTime(gainValue, t + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration + release);
-    gain.connect(audioCtx.destination);
+    gain.connect(mainMixNode || audioCtx.destination);
     return { gain, t };
 }
 
@@ -1058,7 +1087,7 @@ function playSynthMarimba(note, time, duration = 0.42, gain = 0.38) {
     filter.Q.setValueAtTime(3.0, t);
     out.disconnect();
     out.connect(filter);
-    filter.connect(audioCtx.destination);
+    filter.connect(mainMixNode || audioCtx.destination);
 
     const makeOsc = (type, frequency, level = 1) => {
         const osc = audioCtx.createOscillator();
@@ -1129,9 +1158,66 @@ async function loadAudioSample(key, url) {
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        mainMixNode = audioCtx.createGain();
+        mainMixNode.gain.value = 1.0;
+        mainMixNode.connect(audioCtx.destination);
+        
+        try {
+            reverbNode = audioCtx.createConvolver();
+            reverbNode.buffer = createReverbImpulseResponse(0.8, 2.5);
+            reverbGain = audioCtx.createGain();
+            reverbGain.gain.value = 0.10; // Ambiência de sala sutil
+            
+            mainMixNode.connect(reverbNode);
+            reverbNode.connect(reverbGain);
+            reverbGain.connect(audioCtx.destination);
+        } catch (e) {
+            console.error("Failed to initialize convolution reverb:", e);
+        }
+        
+        try {
+            delayNode = audioCtx.createDelay(1.0);
+            delayNode.delayTime.value = 0.07; // tempo de atraso de 70ms (<100ms)
+            delayFeedback = audioCtx.createGain();
+            delayFeedback.gain.value = 0.35; // feedback (realimentação)
+            delayGain = audioCtx.createGain();
+            delayGain.gain.value = 0.0; // seco inicialmente no modo solo
+            
+            mainMixNode.connect(delayNode);
+            delayNode.connect(delayFeedback);
+            delayFeedback.connect(delayNode); // loop de feedback
+            
+            delayNode.connect(delayGain);
+            delayGain.connect(audioCtx.destination);
+        } catch (e) {
+            console.error("Failed to initialize delay node:", e);
+        }
+
         Object.keys(audioUrls).forEach(key => loadAudioSample(key, audioUrls[key]));
+        
+        if (melodyState.masterGain) {
+            try {
+                melodyState.masterGain.disconnect();
+            } catch (err) {}
+            melodyState.masterGain.connect(mainMixNode);
+        }
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    updateTurmaEffects();
+}
+
+function updateTurmaEffects() {
+    if (!audioCtx || !delayGain || !reverbGain) return;
+    if (state.turmaMode) {
+        // Modo turma: delay ativado e reverb ligeiramente aumentado
+        delayGain.gain.setTargetAtTime(0.35, audioCtx.currentTime, 0.05);
+        reverbGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
+    } else {
+        // Modo solo: delay zerado e reverb sutil de sala
+        delayGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.05);
+        reverbGain.gain.setTargetAtTime(0.10, audioCtx.currentTime, 0.05);
+    }
 }
 
 function playPercussionSound(time, side, type) {
@@ -1145,7 +1231,7 @@ function playPercussionSound(time, side, type) {
         const panNode = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
         if(audioCtx.createStereoPanner) panNode.pan.value = hitPanValue;
         gain.connect(panNode); 
-        panNode.connect(audioCtx.destination);
+        panNode.connect(mainMixNode || audioCtx.destination);
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
         source.connect(gain);
@@ -1159,17 +1245,6 @@ function playPercussionSound(time, side, type) {
     if(type === 'Peito') baseVol = 1.2; 
     let basePan = type === 'Palma' ? 0 : (side === 'L' ? -0.4 : 0.4);
     playSingleHit(time, basePan, baseVol);
-
-    if (state.turmaMode) {
-        const numClones = 4; 
-        for (let i = 0; i < numClones; i++) {
-            const delay = (Math.random() * 0.04) + 0.015; 
-            const cloneTime = time + delay;
-            const clonePan = (Math.random() * 2) - 1; 
-            const cloneVol = baseVol * (0.3 + Math.random() * 0.4); 
-            playSingleHit(cloneTime, clonePan, cloneVol);
-        }
-    }
 }
 
 function playMetronome(time, beatIndex) {
@@ -1670,17 +1745,146 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         mesh.userData.isAnimating = false;
     };
 
-    // Cabeça
-    const head = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 32), matSkin);
-    head.position.set(0, 36, 0); 
+    // Determinar cor do cabelo estilizada baseada na pele/aleatória
+    let hairColor = 0x221108; // Castanho escuro padrão
+    if (skinHex === 0xffccaa || skinHex === 0xffbfa3) {
+        const choices = [0x221108, 0x0c0908, 0x4a3728, 0xd4a373];
+        hairColor = choices[Math.floor(Math.random() * choices.length)];
+    } else if (skinHex === 0x8d5524 || skinHex === 0x4d2a22) {
+        const choices = [0x090706, 0x1a0f0a];
+        hairColor = choices[Math.floor(Math.random() * choices.length)];
+    } else {
+        const choices = [0x0c0908, 0x221108, 0x3d2314];
+        hairColor = choices[Math.floor(Math.random() * choices.length)];
+    }
+
+    const matHair  = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85 });
+    const matEyeW  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+    const matEyeP  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 });
+    const matMouth = new THREE.MeshStandardMaterial({ color: 0x9e2a2b, roughness: 0.6 });
+
+    // Cabeça (elevada ligeiramente para dar espaço ao pescoço)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(5.8, 32, 32), matSkin);
+    head.position.set(0, 38, 0); 
     head.castShadow = true;
     group.add(head);
 
-    // Torso
+    // Olhos (esclera + pupila)
+    const eyeWhiteGeo = new THREE.SphereGeometry(0.7, 16, 16);
+    const pupilGeo = new THREE.SphereGeometry(0.4, 16, 16);
+
+    // Olho Esquerdo
+    const eyeWhiteL = new THREE.Mesh(eyeWhiteGeo, matEyeW);
+    eyeWhiteL.position.set(-1.8, 0.8, 5.0);
+    head.add(eyeWhiteL);
+
+    const pupilL = new THREE.Mesh(pupilGeo, matEyeP);
+    pupilL.position.set(-1.8, 0.8, 5.5);
+    head.add(pupilL);
+
+    // Olho Direito
+    const eyeWhiteR = new THREE.Mesh(eyeWhiteGeo, matEyeW);
+    eyeWhiteR.position.set(1.8, 0.8, 5.0);
+    head.add(eyeWhiteR);
+
+    const pupilR = new THREE.Mesh(pupilGeo, matEyeP);
+    pupilR.position.set(1.8, 0.8, 5.5);
+    head.add(pupilR);
+
+    // Sobrancelhas
+    const browGeo = new THREE.BoxGeometry(1.6, 0.25, 0.3);
+    const browL = new THREE.Mesh(browGeo, matHair);
+    browL.position.set(-1.8, 2.0, 5.1);
+    browL.rotation.z = -0.08;
+    head.add(browL);
+
+    const browR = new THREE.Mesh(browGeo, matHair);
+    browR.position.set(1.8, 2.0, 5.1);
+    browR.rotation.z = 0.08;
+    head.add(browR);
+
+    // Nariz
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 1.0), matSkin);
+    nose.position.set(0, -0.6, 5.6);
+    head.add(nose);
+
+    // Boca
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 0.3), matMouth);
+    mouth.position.set(0, -2.4, 5.1);
+    head.add(mouth);
+
+    // Orelhas
+    const earGeo = new THREE.SphereGeometry(1.1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    
+    const earL = new THREE.Mesh(earGeo, matSkin);
+    earL.position.set(-5.8, 0, 0);
+    earL.rotation.z = Math.PI / 2;
+    head.add(earL);
+
+    const earR = new THREE.Mesh(earGeo, matSkin);
+    earR.position.set(5.8, 0, 0);
+    earR.rotation.z = -Math.PI / 2;
+    head.add(earR);
+
+    // Cabelo
+    const hairTop = new THREE.Mesh(new THREE.SphereGeometry(6.1, 32, 16), matHair);
+    hairTop.position.set(0, 1.0, -0.8);
+    head.add(hairTop);
+
+    const bangs = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.0, 3.2), matHair);
+    bangs.position.set(0, 3.8, 3.4);
+    bangs.rotation.x = -0.25;
+    head.add(bangs);
+
+    const sideburnsL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.5, 1.8), matHair);
+    sideburnsL.position.set(-5.8, -0.5, 1.2);
+    head.add(sideburnsL);
+
+    const sideburnsR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.5, 1.8), matHair);
+    sideburnsR.position.set(5.8, -0.5, 1.2);
+    head.add(sideburnsR);
+
+    // Pescoço
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.4, 4.5, 16), matSkin);
+    neck.position.set(0, 32.5, 0);
+    neck.castShadow = true;
+    neck.receiveShadow = true;
+    group.add(neck);
+
+    // Torso (comprimento 16, posicionado em y=26)
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(7, 6, 16, 16), matShirt);
     torso.position.set(0, 26, 0);
     torso.castShadow = true;
     group.add(torso);
+
+    // Gola da camisa
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.0, 1.0, 16), matShirt);
+    collar.position.set(0, 34.1, 0);
+    collar.castShadow = true;
+    group.add(collar);
+
+    // Botões na camisa
+    const matButtons = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4 });
+    const buttonGeo = new THREE.SphereGeometry(0.35, 8, 8);
+    for (let i = 0; i < 3; i++) {
+        const btnY = 31.0 - i * 4.0;
+        const radiusAtY = 6.0 + (btnY - 18.0) / 16.0;
+        const btn = new THREE.Mesh(buttonGeo, matButtons);
+        btn.position.set(0, btnY, radiusAtY + 0.1);
+        group.add(btn);
+    }
+
+    // Cinto
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(6.1, 6.1, 1.2, 16), new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.7 }));
+    belt.position.set(0, 18.0, 0);
+    belt.castShadow = true;
+    group.add(belt);
+
+    // Fivela do Cinto
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 0.4), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.2 }));
+    buckle.position.set(0, 18.0, 6.2);
+    buckle.castShadow = true;
+    group.add(buckle);
 
     // Peito — geometria clonada para cada lado (independência de animação)
     const chestL = new THREE.Mesh(new THREE.BoxGeometry(6, 8, 8), matShirt.clone());
@@ -1696,9 +1900,6 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     parts.R.meshes['Peito'] = chestR;
 
     // Geometrias reutilizáveis
-    const armGeo  = new THREE.CylinderGeometry(2, 2, 15, 16); 
-    armGeo.translate(0, -7.5, 0); 
-    const handGeo = new THREE.SphereGeometry(3.5, 16, 16);
 
     // --- Coxa: comprimento 12 (pivot no topo, cresce para baixo) ---
     const thighGeo = new THREE.CylinderGeometry(3.5, 3.0, 12, 16);
@@ -1709,6 +1910,8 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     shinGeo.translate(0, -5.5, 0);  // pivot no topo (joelho)
 
     const footGeo = new THREE.BoxGeometry(4.5, 3, 9);
+    const soleGeo = new THREE.BoxGeometry(4.7, 0.8, 9.2);
+    const matSole = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.8 });
 
     ['L', 'R'].forEach(side => {
         const isLeft = side === 'L';
@@ -1722,13 +1925,71 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         armPivot.userData.isAnimating = false;
         armPivot.userData.animProgress = 0;
         
-        const armMesh = new THREE.Mesh(armGeo, matSkin.clone());
-        armMesh.castShadow = true;
-        armPivot.add(armMesh);
+        // Articulação do ombro (esfera da cor da camisa)
+        const shoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(2.3, 16, 16), matShirt.clone());
+        shoulderMesh.castShadow = true;
+        armPivot.add(shoulderMesh);
 
-        const handMesh = new THREE.Mesh(handGeo, matSkin.clone());
+        // Manga da camisa (comprimento 6.5)
+        const sleeveGeo = new THREE.CylinderGeometry(2.2, 2.0, 6.5, 16);
+        sleeveGeo.translate(0, -3.25, 0);
+        const sleeveMesh = new THREE.Mesh(sleeveGeo, matShirt.clone());
+        sleeveMesh.castShadow = true;
+        armPivot.add(sleeveMesh);
+
+        // Antebraço (pele, comprimento 8.5)
+        const forearmGeo = new THREE.CylinderGeometry(1.7, 1.4, 8.5, 16);
+        forearmGeo.translate(0, -4.25, 0);
+        const forearmMesh = new THREE.Mesh(forearmGeo, matSkin.clone());
+        forearmMesh.position.y = -6.5;
+        forearmMesh.castShadow = true;
+        armPivot.add(forearmMesh);
+
+        const handMat = matSkin.clone();
+        
+        // Palma da mão
+        const palmGeo = new THREE.BoxGeometry(3.2, 4.0, 1.2);
+        palmGeo.translate(0, -2.0, 0); // Pivô no pulso
+        
+        const handMesh = new THREE.Mesh(palmGeo, handMat);
         handMesh.position.set(0, -15, 0); 
         setupGlowAndShadow(handMesh);
+        
+        // Polegar (Thumb)
+        const thumbGeo = new THREE.BoxGeometry(0.75, 1.8, 0.75);
+        thumbGeo.translate(0, -0.9, 0); // Pivô na base do polegar
+        
+        const thumbMesh = new THREE.Mesh(thumbGeo, handMat);
+        // O polegar fica na lateral interna da mão (direção de -sign)
+        thumbMesh.position.set(-sign * 1.6, -1.8, 0.25);
+        thumbMesh.rotation.z = sign * 0.45; // Angulado para dentro (direção medial)
+        thumbMesh.rotation.x = -0.3;        // Angulado levemente para a frente
+        thumbMesh.castShadow = true;
+        thumbMesh.receiveShadow = true;
+        handMesh.add(thumbMesh);
+
+        // Dedos (Indicador, Médio, Anelar, Mínimo)
+        const fingerWidth = 0.6;
+        const fingerThick = 0.6;
+        const fingerSpacing = 0.7;
+        const fingerLengths = [2.2, 2.5, 2.3, 1.8]; // Proporções realistas dos dedos
+        
+        for (let i = 0; i < 4; i++) {
+            const length = fingerLengths[i];
+            const fingerGeo = new THREE.BoxGeometry(fingerWidth, length, fingerThick);
+            fingerGeo.translate(0, -length / 2, 0); // Pivô na base do dedo
+            
+            const fingerMesh = new THREE.Mesh(fingerGeo, handMat);
+            // X-position: do indicador (mais interno, -sign) ao mínimo (mais externo, sign)
+            const xOffset = (-1.5 + i) * fingerSpacing;
+            const fingerX = sign * xOffset;
+            
+            fingerMesh.position.set(fingerX, -4.0, 0);
+            fingerMesh.castShadow = true;
+            fingerMesh.receiveShadow = true;
+            handMesh.add(fingerMesh);
+        }
+        
         armPivot.add(handMesh);
 
         group.add(armPivot);
@@ -1737,7 +1998,6 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         parts[side].meshes['Estalo'] = handMesh; 
 
         // ---- PERNA: pivot no quadril (y=18 = base do torso) ----
-        // quadril=18, coxa=12→joelho em 6, canela=11→tornozelo em -5, pé (h=3) centrado em -6.5 ≈ rente ao chão
         const legPivot = new THREE.Group();
         legPivot.position.set(sign * 4, 18, 0);
         legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
@@ -1767,6 +2027,16 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         const footMesh = new THREE.Mesh(footGeo, matShoes.clone());
         footMesh.position.set(0, -11, 4); 
         setupGlowAndShadow(footMesh);
+        
+        // Adicionar sola branca e cadarços para parecer um tênis esportivo real
+        const soleMesh = new THREE.Mesh(soleGeo, matSole);
+        soleMesh.position.set(0, -1.2, 0);
+        footMesh.add(soleMesh);
+
+        const lacesMesh = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.4, 3.5), matSole);
+        lacesMesh.position.set(0, 1.6, 1.0);
+        footMesh.add(lacesMesh);
+
         shinPivot.add(footMesh);
 
         legPivot.add(shinPivot);
@@ -1776,8 +2046,6 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         parts[side].shinPivot = shinPivot;
 
         // Mapeamento de meshes para iluminação:
-        // 'Coxa' → apenas thighMesh (parte superior)
-        // 'Pé'   → footMesh
         parts[side].meshes['Coxa'] = thighMesh;
         parts[side].meshes['Pé']   = footMesh;
     });
@@ -1873,6 +2141,7 @@ function setTurmaLayout(layout) {
     });
 
     updateTurmaButton();
+    updateTurmaEffects();
 }
 
 function updateTurmaButton() {
@@ -2010,13 +2279,20 @@ function animate3D() {
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
         avatar.group.rotation.y += diff * 0.15;
 
-        // Bob de reprodução
+        const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
+        const baseHeight = 7.0;
+        const walkLift = walkingIntensity * 0.2;
+        const walkBounce = Math.abs(Math.cos(walkClock + clonePhaseOffset)) * 0.5 * walkingIntensity;
+
+        // Bob de reprodução e elevação natural ao caminhar
         if (state.isPlaying) {
             const t = Date.now() * 0.005;
             const offset = avatar.group.position.x * 0.1; 
-            avatar.group.position.y = 7 + Math.sin(t + offset) * 0.75;
+            const bob = Math.sin(t + offset) * 0.4;
+            avatar.group.position.y = baseHeight + bob + walkLift + walkBounce;
         } else {
-            avatar.group.position.y += (7 - avatar.group.position.y) * 0.1;
+            const targetRestY = baseHeight + walkLift + walkBounce;
+            avatar.group.position.y += (targetRestY - avatar.group.position.y) * 0.1;
         }
 
         ['L', 'R'].forEach(side => {
@@ -2029,7 +2305,6 @@ function animate3D() {
 
             // Caminhada automática durante o deslocamento.
             // O balanço é alternado: quando uma perna vai à frente, a outra vai para trás.
-            const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
             const phase = walkClock + clonePhaseOffset + (side === 'L' ? 0 : Math.PI);
             const swing = Math.sin(phase) * 0.42 * walkingIntensity;
             const kneeBend = Math.max(0, Math.sin(phase + Math.PI / 2)) * 0.42 * walkingIntensity;
