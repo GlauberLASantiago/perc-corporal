@@ -169,6 +169,7 @@
         .move-grid { grid-template-columns: repeat(3, 1fr); }
         .move-grid .step-btn { font-size: 1.05em; padding: 9px 5px; }
         .move-grid .move-reset { background: #f4ecf7; }
+        .move-grid .pos-reset { background: #fefde8; }
 
         .step-btn.selected { box-shadow: 0 0 5px rgba(0,0,0,0.2); transform: scale(0.95); }
 
@@ -236,21 +237,191 @@
         }
 
         #controls {
-            padding: 15px 20px; background: var(--ui-bg); display: flex;
-            align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;
+            padding: 12px 15px;
+            background: var(--ui-bg);
+            border-top: 1px solid var(--ui-border);
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+            z-index: 10;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.02);
         }
-        .control-group { display: flex; align-items: center; gap: 10px; }
-        button { padding: 8px 16px; border: none; border-radius: 6px; background: #eee; color: #333; font-weight: bold; cursor: pointer; }
-        button:hover { background: #ddd; }
 
-        #play-btn { background: #27ae60; color: white; font-size: 1.1em; padding: 10px 24px; }
-        #play-btn.playing { background: #e74c3c; }
-        
-        #toggle-sequencer-btn { background: #e67e22; color: white; }
-        #toggle-sequencer-btn:hover { background: #d35400; }
+        #controls.collapsed {
+            justify-content: center;
+            padding: 6px 15px;
+        }
 
-        input[type="range"] { width: 100px; }
-        .bpm-display { min-width: 60px; font-variant-numeric: tabular-nums; }
+        #controls.collapsed > *:not(#toggle-options-btn) {
+            display: none !important;
+        }
+
+        button {
+            padding: 9px 15px;
+            border: none;
+            border-radius: 8px;
+            background: #f1f3f5;
+            color: #495057;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        button:hover {
+            background: #e9ecef;
+            color: #212529;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #play-btn {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+            font-size: 1.1em;
+            padding: 10px 22px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+        }
+
+        #play-btn:hover {
+            background: linear-gradient(135deg, #27ae60, #219653);
+            box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+        }
+
+        #play-btn.playing {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+        }
+
+        #play-btn.playing:hover {
+            background: linear-gradient(135deg, #c0392b, #a82c1e);
+            box-shadow: 0 6px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        #toggle-sequencer-btn {
+            background: linear-gradient(135deg, #f39c12, #d35400);
+            color: white;
+            box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3);
+        }
+
+        #toggle-sequencer-btn:hover {
+            background: linear-gradient(135deg, #e67e22, #ca6f1e);
+            box-shadow: 0 6px 15px rgba(243, 156, 18, 0.4);
+        }
+
+        select {
+            padding: 7px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background-color: white;
+            font-family: inherit;
+            font-weight: 600;
+            color: #495057;
+            cursor: pointer;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        select:focus {
+            border-color: #80bdff;
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        .bpm-control-wrapper {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            overflow: hidden;
+        }
+
+        .bpm-control-wrapper button {
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 6px 12px;
+            color: #495057;
+        }
+
+        .bpm-control-wrapper button:hover {
+            background: #f8f9fa;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .bpm-control-wrapper input {
+            border: none;
+            border-left: 1px solid #ced4da;
+            border-right: 1px solid #ced4da;
+            border-radius: 0;
+            margin: 0;
+            padding: 6px 0;
+            font-size: 1em;
+            color: #495057;
+            width: 50px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .bpm-control-wrapper input:focus {
+            outline: none;
+            background-color: #f1f3f5;
+        }
+
+        .slider-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .slider-item input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #dee2e6;
+            outline: none;
+            -webkit-appearance: none;
+            min-width: 60px;
+        }
+
+        .slider-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: background 0.15s ease;
+        }
+
+        .slider-item input[type="range"]::-webkit-slider-thumb:hover {
+            background: #2980b9;
+        }
+
+        .slider-item input[type="number"] {
+            width: 60px;
+            padding: 6px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .bpm-display { min-width: 65px; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main); }
 
         #modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -286,8 +457,11 @@
             :root { --cell-size: 35px; }
             #playhead { left: 60px; }
             #hint { display: none; }
-            #controls { justify-content: center; }
-            .control-group { flex-wrap: wrap; justify-content: center; }
+            #controls {
+                padding: 8px;
+                gap: 6px;
+                justify-content: center;
+            }
             #glossary-panel { max-height: 80vh; overflow-y: auto; }
         }
     </style>
@@ -329,13 +503,6 @@
                 <div class="step-btn right" draggable="true" data-foot="R" data-type="Palma">👏 Palma</div>
                 <div class="step-btn right" draggable="true" data-foot="R" data-type="Estalo">🫰 Estalo</div>
             </div>
-            <div class="library-title" style="margin-top: 15px;">Giro do Corpo</div>
-            <div class="step-group">
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Frente">⬆️ Frente</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Esq">⬅️ Esq</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Dir">➡️ Dir</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="Trás">⬇️ Trás</div>
-            </div>
             <div class="library-title" style="margin-top: 15px;">Deslocamento</div>
             <div class="step-group move-grid" aria-label="Rosa dos ventos para deslocamento">
                 <div class="step-btn move" draggable="true" data-type="Move" data-val="↖" title="Mover na diagonal frente-esquerda">↖</div>
@@ -348,6 +515,18 @@
                 <div class="step-btn move" draggable="true" data-type="Move" data-val="↓" title="Mover para trás">↓</div>
                 <div class="step-btn move" draggable="true" data-type="Move" data-val="↘" title="Mover na diagonal trás-direita">↘</div>
             </div>
+            <div class="library-title" style="margin-top: 15px;">Giro do Corpo</div>
+            <div class="step-group move-grid" aria-label="Rosa dos ventos para giro">
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↖" title="Girar na diagonal frente-esquerda">↖</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↑" title="Girar para frente">↑</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↗" title="Girar na diagonal frente-direita">↗</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="←" title="Girar para a esquerda">←</div>
+                <div class="step-btn pos pos-reset" draggable="true" data-type="Pos" data-val="X" title="Voltar à orientação inicial">X</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="→" title="Girar para a direita">→</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↙" title="Girar na diagonal trás-esquerda">↙</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↓" title="Girar para trás">↓</div>
+                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↘" title="Girar na diagonal trás-direita">↘</div>
+            </div>
         </div>
 
         <div id="timeline-wrapper">
@@ -356,57 +535,55 @@
                 <button id="clear-btn" title="Limpar Tudo" style="background:#e74c3c; color:white; font-size:0.8em; padding:5px 12px;">🗑️ Limpar tudo</button>
             </div>
             <div class="timeline-header" id="tl-header"><div></div></div>
-            <div class="timeline-row" id="row-pos"><div class="row-label pos">GIRO</div></div>
-            <div class="timeline-row" id="row-move"><div class="row-label move">DESL</div></div>
             <div class="timeline-row" id="row-left"><div class="row-label left">ESQ</div></div>
             <div class="timeline-row" id="row-right"><div class="row-label right">DIR</div></div>
+            <div class="timeline-row" id="row-move"><div class="row-label move">DESL</div></div>
+            <div class="timeline-row" id="row-pos"><div class="row-label pos">GIRO</div></div>
         </div>
     </div>
 
     <div id="controls">
-        <div class="control-group">
-            <button id="play-btn">▶ Play</button>
-            <button id="toggle-sequencer-btn" title="Mostrar/Esconder a linha do tempo">🛠️ Abrir Sequenciador</button>
+        <button id="play-btn">▶ Play</button>
+        <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
+        <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
+
+        <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="font-size: 0.85em; font-weight: bold; color: var(--text-main);">BPM:</span>
+            <div class="bpm-control-wrapper" title="BPM (Batidas por minuto)">
+                <button id="bpm-down">-</button>
+                <input type="number" id="bpm-input" min="40" max="240" value="75">
+                <button id="bpm-up">+</button>
+            </div>
         </div>
+
+        <select id="meter-select" title="Escolher compasso">
+            <option value="2/4">2/4</option>
+            <option value="3/4">3/4</option>
+            <option value="4/4" selected>4/4</option>
+            <option value="6/8">6/8</option>
+        </select>
+
+        <div class="control-item" style="display: inline-flex; align-items: center; gap: 6px; background: #f8f9fa; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2980b9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline></svg>
+            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-main);" title="Use para alinhar imagem e áudio ao usar fone/caixa Bluetooth">Atraso BT:</label>
+            <input type="range" id="visual-delay-slider" min="0" max="1000" step="10" value="0" style="width: 80px; margin: 0 4px; height: 5px;">
+            <span id="visual-delay-label" class="bpm-display" style="font-size: 0.85em; min-width: 50px;">0 ms</span>
+        </div>
+
+        <button id="toggle-sequencer-btn" title="Mostrar/Esconder a linha do tempo">🛠️ Abrir Sequenciador</button>
+        <button id="presets-btn">🎓 Aprender rítmos</button>
         
-        <div class="control-group">
-            <label>Compasso:</label>
-            <select id="meter-select" title="Escolher compasso">
-                <option value="2/4">2/4</option>
-                <option value="3/4">3/4</option>
-                <option value="4/4" selected>4/4</option>
-                <option value="6/8">6/8</option>
-            </select>
-            <label style="margin-left: 10px;">BPM <span id="bpm-unit-label">(♩)</span>:</label>
-            <button id="bpm-down" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Diminuir BPM">-</button>
-            <input type="number" id="bpm-input" min="40" max="240" value="75" style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
-            <button id="bpm-up" style="padding: 4px 10px; font-size: 1.1em; line-height: 1;" title="Aumentar BPM">+</button>
-            <label style="margin-left: 10px;">Velocidade:</label>
-            <select id="speed-select">
-                <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
-            </select>
-            <label style="margin-left: 10px;" title="Use quando o som em caixa/fone Bluetooth chega depois da animação. Atrasar o visual ajuda a alinhar imagem e áudio.">Atraso visual BT:</label>
-            <input type="range" id="visual-delay-slider" min="0" max="1000" step="10" value="0" title="Atraso do visual em milissegundos para compensar latência Bluetooth">
-            <input type="number" id="visual-delay-input" min="0" max="1000" step="10" value="0" title="Atraso do visual em milissegundos" style="width: 70px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-family: inherit;">
-            <span id="visual-delay-label" class="bpm-display" title="Atraso aplicado apenas ao visual">0 ms</span>
-        </div>
+        <button id="import-btn">📥 Importar rítmos</button>
+        <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
+        <button id="export-btn">📤 Exportar rítmos</button>
+        <button id="export-midi-btn">🎼 Exportar MIDI</button>
+        <button id="export-image-btn">🖼️ Exportar Imagem</button>
 
-        <div class="control-group">
-            <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
-            <button id="metro-btn" style="background: #ddd;">🔔 Metrônomo: ON</button>
-            <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Gerar melodia: OFF</button>
-            <button id="loop-btn" style="background: #27ae60; color:white;">🔁 Loop: ON</button>
-        </div>
+        <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
+        <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Melodia: OFF</button>
+        <button id="toggle-glossary-btn" style="background: #3498db; color:white;">📖 Ouvir Sons</button>
 
-        <div class="control-group">
-            <button id="toggle-glossary-btn" style="background: #3498db; color:white;">📖 Ouvir Sons</button>
-            <button id="presets-btn">🎓 Aprender (Ritmos)</button>
-            <button id="export-btn">📤 Exportar JSON</button>
-            <button id="export-midi-btn">🎼 Exportar MIDI</button>
-            <button id="export-image-btn">🖼️ Exportar imagem</button>
-            <button id="import-btn">📥 Importar</button>
-            <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
-        </div>
+        <button id="toggle-options-btn" onclick="toggleOptions()" style="background: #7f8c8d; color: white;" title="Ocultar/Mostrar barra de opções">🙈 Ocultar Opções</button>
     </div>
 
     <div id="footer-credits">
@@ -569,7 +746,7 @@ function buildTimeline() {
     }
 
     for (let i = 0; i < state.totalSteps; i++) {
-        [ {r: 'Pos', p: rowPos}, {r: 'Move', p: rowMove}, {r: 'L', p: rowL}, {r: 'R', p: rowR} ].forEach(cfgRow => {
+        [ {r: 'L', p: rowL}, {r: 'R', p: rowR}, {r: 'Move', p: rowMove}, {r: 'Pos', p: rowPos} ].forEach(cfgRow => {
             const cell = document.createElement('div');
             cell.className = 'time-cell';
             if (i % cfg.measureSteps === 0) cell.classList.add('bar-line');
@@ -640,10 +817,10 @@ const melodyState = {
 const melodyMidiProgram = 12; // General MIDI: Marimba
 const melodySoundfontName = 'marimba';
 
-// Escala pentatônica maior de Fá no intervalo C4-D5.
-// Fá maior pentatônica: F, G, A, C, D. Entre C4 e D5: C4, D4, F4, G4, A4, C5, D5.
-const melodyPool = ['C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5'];
-const melodyContour = [0, 1, 2, 4, 3, 5, 6, 5, 3, 2, 4, 1];
+// Escala pentatônica maior de Dó no intervalo C4-C5 (uma oitava).
+// Dó maior pentatônica: C, D, E, G, A. Entre C4 e C5: C4, D4, E4, G4, A4, C5.
+const melodyPool = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5'];
+const melodyContour = [0, 1, 2, 4, 3, 5, 4, 3, 2, 1, 2, 0];
 
 
 // Mapeamento General MIDI de bateria/percussão no canal 10.
@@ -675,12 +852,17 @@ function hasBodyRhythm(stepData) {
 }
 
 function chooseMelodyNote(stepNumber, stepData) {
-    const cfg = getMeterConfig();
-    const contourIndex = (melodyState.noteIndex + Math.floor(stepNumber / Math.max(1, cfg.pulseSteps))) % melodyContour.length;
-    let noteIndex = melodyContour[contourIndex] % melodyPool.length;
+    let noteIndex;
+    if (melodyState.noteIndex === 0) {
+        noteIndex = 0;
+    } else {
+        const cfg = getMeterConfig();
+        const contourIndex = (melodyState.noteIndex + Math.floor(stepNumber / Math.max(1, cfg.pulseSteps))) % melodyContour.length;
+        noteIndex = melodyContour[contourIndex] % melodyPool.length;
 
-    // Pequena variação determinística: acentos com dois gestos simultâneos tendem à nota superior.
-    if (getRhythmicWeight(stepData) > 1) noteIndex = Math.min(melodyPool.length - 1, noteIndex + 1);
+        // Pequena variação determinística: acentos com dois gestos simultâneos tendem à nota superior.
+        if (getRhythmicWeight(stepData) > 1) noteIndex = Math.min(melodyPool.length - 1, noteIndex + 1);
+    }
     melodyState.noteIndex++;
     return melodyPool[noteIndex];
 }
@@ -694,8 +876,8 @@ function updateMelodyButton(loading = false) {
         btn.style.color = 'white';
         return;
     }
-    const labelMap = { webaudiofont: 'WAF', soundfont: 'SF', interno: 'INT' };
-    const modo = melodyState.ready ? labelMap[melodyState.mode] : '';
+    const labelMap = { webaudiofont: '', soundfont: 'SF', interno: 'INT' };
+    const modo = (melodyState.ready && labelMap[melodyState.mode]) ? labelMap[melodyState.mode] : '';
     btn.textContent = state.melodyOn ? `🎵 Gerar melodia: ON${modo ? ' · ' + modo : ''}` : '🎵 Gerar melodia: OFF';
     btn.style.background = state.melodyOn ? '#5d4037' : '#795548';
     btn.style.color = 'white';
@@ -1004,7 +1186,7 @@ function playMetronome(time, beatIndex) {
 }
 
 function secondsPerStep() {
-    return (60.0 / (state.bpm * state.speedMultiplier)) / getMeterConfig().stepDivisor;
+    return (60.0 / state.bpm) / getMeterConfig().stepDivisor;
 }
 
 function getVisualDelaySeconds() {
@@ -1018,10 +1200,8 @@ function updateVisualDelayUI(value) {
     state.visualDelayMs = delayMs;
 
     const slider = document.getElementById('visual-delay-slider');
-    const input = document.getElementById('visual-delay-input');
     const label = document.getElementById('visual-delay-label');
     if (slider) slider.value = delayMs;
-    if (input) input.value = delayMs;
     if (label) label.textContent = `${delayMs} ms`;
 }
 
@@ -1031,6 +1211,7 @@ function nextNote() {
     if (state.currentStep >= state.totalSteps) {
         if(state.loopOn) {
             state.currentStep = 0;
+            melodyState.noteIndex = 0;
             loopStartTime += (state.totalSteps * secondsPerStepValue);
         } else {
             stopPlayback();
@@ -1174,14 +1355,8 @@ function initUI() {
     bpmInput.addEventListener('change', (e) => updateBpm(e.target.value));
     document.getElementById('bpm-down').addEventListener('click', () => updateBpm(state.bpm - 1));
     document.getElementById('bpm-up').addEventListener('click', () => updateBpm(state.bpm + 1));
-    document.getElementById('speed-select').addEventListener('change', (e) => { 
-        state.speedMultiplier = parseFloat(e.target.value); 
-    });
-
     const visualDelaySlider = document.getElementById('visual-delay-slider');
-    const visualDelayInput = document.getElementById('visual-delay-input');
     if (visualDelaySlider) visualDelaySlider.addEventListener('input', (e) => updateVisualDelayUI(e.target.value));
-    if (visualDelayInput) visualDelayInput.addEventListener('change', (e) => updateVisualDelayUI(e.target.value));
     updateVisualDelayUI(state.visualDelayMs);
 
     document.getElementById('meter-select').addEventListener('change', (e) => {
@@ -1236,6 +1411,7 @@ function initUI() {
 function setupCellEvents(cell) {
     cell.addEventListener('click', () => {
         const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
+        const hasClap = (state.sequence[col].L === 'Palma' || state.sequence[col].R === 'Palma');
         if (state.selectedTool) {
             if (state.selectedTool.kind === 'Pos' && row === 'Pos') {
                 state.sequence[col][row] = state.sequence[col][row] === state.selectedTool.val ? null : state.selectedTool.val;
@@ -1245,18 +1421,41 @@ function setupCellEvents(cell) {
                 renderSequenceUI();
             } else if (state.selectedTool.kind === 'Body' && (row === 'L' || row === 'R')) {
                 let targetRow = row;
-                if (state.sequence[col][targetRow] === state.selectedTool.type) { 
-                    state.sequence[col][targetRow] = null; 
+                if (state.selectedTool.type === 'Palma') {
+                    if (hasClap) {
+                        if (state.sequence[col].L === 'Palma') state.sequence[col].L = null;
+                        if (state.sequence[col].R === 'Palma') state.sequence[col].R = null;
+                    } else {
+                        state.sequence[col][targetRow] = 'Palma';
+                        initAudio(); 
+                        playPercussionSound(audioCtx.currentTime, targetRow, 'Palma'); 
+                        triggerAnimation(targetRow, 'Palma');
+                    }
                 } else {
-                    state.sequence[col][targetRow] = state.selectedTool.type;
-                    initAudio(); 
-                    playPercussionSound(audioCtx.currentTime, targetRow, state.selectedTool.type); 
-                    triggerAnimation(targetRow, state.selectedTool.type);
+                    if (state.sequence[col][targetRow] === 'Palma') {
+                        if (state.sequence[col].L === 'Palma') state.sequence[col].L = null;
+                        if (state.sequence[col].R === 'Palma') state.sequence[col].R = null;
+                    }
+                    if (state.sequence[col][targetRow] === state.selectedTool.type) { 
+                        state.sequence[col][targetRow] = null; 
+                    } else {
+                        state.sequence[col][targetRow] = state.selectedTool.type;
+                        initAudio(); 
+                        playPercussionSound(audioCtx.currentTime, targetRow, state.selectedTool.type); 
+                        triggerAnimation(targetRow, state.selectedTool.type);
+                    }
                 }
                 renderSequenceUI();
             }
-        } else if (state.sequence[col][row] !== null) {
-            state.sequence[col][row] = null; renderSequenceUI();
+        } else {
+            const isDisplayingClap = (state.sequence[col][row] === 'Palma' || (state.sequence[col][row] === null && (state.sequence[col].L === 'Palma' || state.sequence[col].R === 'Palma')));
+            if (isDisplayingClap && (row === 'L' || row === 'R')) {
+                if (state.sequence[col].L === 'Palma') state.sequence[col].L = null;
+                if (state.sequence[col].R === 'Palma') state.sequence[col].R = null;
+            } else if (state.sequence[col][row] !== null) {
+                state.sequence[col][row] = null;
+            }
+            renderSequenceUI();
         }
     });
 
@@ -1269,6 +1468,10 @@ function setupCellEvents(cell) {
             } else if (state.draggedData.kind === 'Move' && row === 'Move') {
                 state.sequence[col][row] = state.draggedData.val;
             } else if (state.draggedData.kind === 'Body' && (row === 'L' || row === 'R')) {
+                if (state.draggedData.type === 'Palma') {
+                    if (state.sequence[col].L === 'Palma') state.sequence[col].L = null;
+                    if (state.sequence[col].R === 'Palma') state.sequence[col].R = null;
+                }
                 state.sequence[col][row] = state.draggedData.type;
             }
             renderSequenceUI();
@@ -1279,19 +1482,31 @@ function setupCellEvents(cell) {
 function renderSequenceUI() {
     document.querySelectorAll('.time-cell').forEach(cell => {
         const col = parseInt(cell.dataset.col); const row = cell.dataset.row;
-        const stepType = state.sequence[col][row];
         cell.classList.remove('active-pos', 'active-move', 'active-left', 'active-right', 'playing'); cell.textContent = '';
-        if (stepType) {
-            if (row === 'Pos') {
+        if (row === 'Pos') {
+            const stepType = state.sequence[col]['Pos'];
+            if (stepType) {
                 cell.classList.add('active-pos');
                 cell.textContent = stepType.substring(0, 3); 
-            } else if (row === 'Move') {
+            }
+        } else if (row === 'Move') {
+            const stepType = state.sequence[col]['Move'];
+            if (stepType) {
                 cell.classList.add('active-move');
                 cell.textContent = stepType;
-            } else {
+            }
+        } else if (row === 'L' || row === 'R') {
+            const cellVal = state.sequence[col][row];
+            if (cellVal !== null && cellVal !== 'Palma') {
                 cell.classList.add(row === 'L' ? 'active-left' : 'active-right');
-                const abv = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es' };
-                cell.textContent = abv[stepType] || stepType;
+                const abv = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Estalo': 'Es' };
+                cell.textContent = abv[cellVal] || cellVal;
+            } else {
+                const hasClap = (state.sequence[col]['L'] === 'Palma' || state.sequence[col]['R'] === 'Palma');
+                if (hasClap) {
+                    cell.classList.add(row === 'L' ? 'active-left' : 'active-right');
+                    cell.textContent = 'Pl';
+                }
             }
         }
     });
@@ -1743,10 +1958,19 @@ function animate3D() {
 
             if (evt.data.Pos) {
                 switch(evt.data.Pos) {
-                    case 'Frente': targetBodyRotY = 0; break;
-                    case 'Esq':    targetBodyRotY = Math.PI / 2; break;
-                    case 'Trás':   targetBodyRotY = Math.PI; break;
-                    case 'Dir':    targetBodyRotY = -Math.PI / 2; break;
+                    case 'Frente':
+                    case '↑':
+                    case 'X':      targetBodyRotY = 0; break;
+                    case 'Esq':
+                    case '←':      targetBodyRotY = Math.PI / 2; break;
+                    case 'Trás':
+                    case '↓':      targetBodyRotY = Math.PI; break;
+                    case 'Dir':
+                    case '→':      targetBodyRotY = -Math.PI / 2; break;
+                    case '↖':      targetBodyRotY = Math.PI / 4; break;
+                    case '↗':      targetBodyRotY = -Math.PI / 4; break;
+                    case '↙':      targetBodyRotY = 3 * Math.PI / 4; break;
+                    case '↘':      targetBodyRotY = -3 * Math.PI / 4; break;
                 }
             }
 
@@ -1936,7 +2160,22 @@ function loadSequence(seqData, meter = state.meter) {
     } else {
         state.sequence = makeEmptySequence(state.totalSteps);
     }
-    seqData.forEach(item => { if(item.step >= 0 && item.step < state.totalSteps) state.sequence[item.step][item.f] = item.t; });
+    seqData.forEach(item => {
+        if(item.step >= 0 && item.step < state.totalSteps) {
+            let val = item.t;
+            if (item.f === 'Pos') {
+                const mapPos = { 'Frente': '↑', 'Esq': '←', 'Dir': '→', 'Trás': '↓' };
+                if (mapPos[val]) val = mapPos[val];
+            }
+            state.sequence[item.step][item.f] = val;
+        }
+    });
+    // Deduplicate Palma in state sequence for safety
+    state.sequence.forEach(step => {
+        if (step.L === 'Palma' && step.R === 'Palma') {
+            step.R = null;
+        }
+    });
     renderSequenceUI(); closeModal();
 }
 
@@ -2087,6 +2326,29 @@ function makeMidiTrack(trackBytes) {
     ];
 }
 
+function serializeEventsToTrack(events) {
+    events.sort((a, b) => {
+        if (a.tick !== b.tick) return a.tick - b.tick;
+        const getPriority = (event) => {
+            const status = event.bytes[0];
+            if (status === 0xFF || (status & 0xF0) === 0xC0) return 0;
+            if ((status & 0xF0) === 0x80) return 1;
+            if ((status & 0xF0) === 0x90) return 2;
+            return 3;
+        };
+        return getPriority(a) - getPriority(b);
+    });
+
+    const trackBytes = [];
+    let lastTick = 0;
+    events.forEach(event => {
+        const delta = event.tick - lastTick;
+        trackBytes.push(...writeVarLen(delta), ...event.bytes);
+        lastTick = event.tick;
+    });
+    return trackBytes;
+}
+
 function exportMidiSequence() {
     const melodyEvents = getMelodyEventsForExport();
     const percussionEvents = getPercussionEventsForExport();
@@ -2110,41 +2372,67 @@ function exportMidiSequence() {
     const denomPow = Math.log2(denominator);
 
     // Track 1: marimba melódica, canal 1.
-    const melodyTrack = [];
-    melodyTrack.push(0x00, 0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF);
-    melodyTrack.push(0x00, 0xFF, 0x58, 0x04, numerator, denomPow, 24, 8);
-    pushTextMeta(melodyTrack, 0, 0x03, 'Marimba - Gerar melodia');
-    pushTextMeta(melodyTrack, 0, 0x01, `Compasso: ${state.meter}; Andamento: ${state.bpm} BPM; Velocidade: ${Math.round(state.speedMultiplier * 100)}%; Tessitura: C4-D5`);
-    melodyTrack.push(0x00, 0xC0, melodyMidiProgram);
+    const melodyEventsList = [];
+    melodyEventsList.push({
+        tick: 0,
+        bytes: [0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF]
+    });
+    melodyEventsList.push({
+        tick: 0,
+        bytes: [0xFF, 0x58, 0x04, numerator, denomPow, 24, 8]
+    });
 
-    let melodyCurrentTick = 0;
+    melodyEventsList.push({
+        tick: 0,
+        bytes: [0xC0, melodyMidiProgram]
+    });
+
     const melodyNoteDuration = Math.max(30, Math.round(stepTicks * 0.86));
     melodyEvents.forEach(ev => {
         const startTick = ev.step * stepTicks;
-        const deltaToStart = Math.max(0, startTick - melodyCurrentTick);
-        melodyTrack.push(...writeVarLen(deltaToStart), 0x90, ev.midi, 92);
-        melodyTrack.push(...writeVarLen(melodyNoteDuration), 0x80, ev.midi, 0);
-        melodyCurrentTick = startTick + melodyNoteDuration;
+        melodyEventsList.push({
+            tick: startTick,
+            bytes: [0x90, ev.midi, 92]
+        });
+        melodyEventsList.push({
+            tick: startTick + melodyNoteDuration,
+            bytes: [0x80, ev.midi, 0]
+        });
     });
-    melodyTrack.push(0x00, 0xFF, 0x2F, 0x00);
+
+    const maxMelodyTick = melodyEventsList.reduce((max, ev) => Math.max(max, ev.tick), 0);
+    melodyEventsList.push({
+        tick: maxMelodyTick,
+        bytes: [0xFF, 0x2F, 0x00]
+    });
+
+    const melodyTrack = serializeEventsToTrack(melodyEventsList);
 
     // Track 2: percussão corporal exportada como bateria General MIDI, canal 10.
-    const percussionTrack = [];
-    pushTextMeta(percussionTrack, 0, 0x03, 'Percussão corporal - Canal 10');
-    pushTextMeta(percussionTrack, 0, 0x01, 'Mapa: Pé=bumbo; Coxa=tom grave; Peito=surdo/tom de chão; Palma=palmas; Estalo=caixa lateral');
+    const percussionEventsList = [];
 
-    let percussionCurrentTick = 0;
+
+
     const percussionNoteDuration = Math.max(24, Math.round(stepTicks * 0.52));
-    percussionEvents
-        .sort((a, b) => (a.step - b.step) || (a.midi - b.midi) || a.side.localeCompare(b.side))
-        .forEach(ev => {
-            const startTick = ev.step * stepTicks;
-            const deltaToStart = Math.max(0, startTick - percussionCurrentTick);
-            percussionTrack.push(...writeVarLen(deltaToStart), 0x99, ev.midi, ev.velocity); // canal 10: 0x99
-            percussionTrack.push(...writeVarLen(percussionNoteDuration), 0x89, ev.midi, 0);
-            percussionCurrentTick = startTick + percussionNoteDuration;
+    percussionEvents.forEach(ev => {
+        const startTick = ev.step * stepTicks;
+        percussionEventsList.push({
+            tick: startTick,
+            bytes: [0x99, ev.midi, ev.velocity]
         });
-    percussionTrack.push(0x00, 0xFF, 0x2F, 0x00);
+        percussionEventsList.push({
+            tick: startTick + percussionNoteDuration,
+            bytes: [0x89, ev.midi, 0]
+        });
+    });
+
+    const maxPercussionTick = percussionEventsList.reduce((max, ev) => Math.max(max, ev.tick), 0);
+    percussionEventsList.push({
+        tick: maxPercussionTick,
+        bytes: [0xFF, 0x2F, 0x00]
+    });
+
+    const percussionTrack = serializeEventsToTrack(percussionEventsList);
 
     const header = [
         0x4D,0x54,0x68,0x64,
@@ -2221,10 +2509,10 @@ function exportSequenceCertificateImage() {
     const cellW = gridW / state.totalSteps;
     const rowH = 72;
     const rows = [
-        { key: 'Pos', label: 'GIRO', color: '#f9d65c' },
-        { key: 'Move', label: 'DESL', color: '#ba68c8' },
         { key: 'L', label: 'ESQ', color: '#4db6ac' },
-        { key: 'R', label: 'DIR', color: '#ff8a65' }
+        { key: 'R', label: 'DIR', color: '#ff8a65' },
+        { key: 'Move', label: 'DESL', color: '#ba68c8' },
+        { key: 'Pos', label: 'GIRO', color: '#f9d65c' }
     ];
 
     ctx.textAlign = 'left';
@@ -2247,7 +2535,15 @@ function exportSequenceCertificateImage() {
             ctx.fillRect(x, y, cellW - 2, rowH - 12);
             ctx.strokeRect(x, y, cellW - 2, rowH - 12);
 
-            const val = state.sequence[i][row.key];
+            let val = state.sequence[i][row.key];
+            if (row.key === 'L' || row.key === 'R') {
+                if (val === null || val === 'Palma') {
+                    const hasClap = (state.sequence[i].L === 'Palma' || state.sequence[i].R === 'Palma');
+                    if (hasClap) {
+                        val = 'Palma';
+                    }
+                }
+            }
             if (val) {
                 ctx.fillStyle = row.color;
                 ctx.fillRect(x + 3, y + 3, Math.max(3, cellW - 8), rowH - 18);
@@ -2318,9 +2614,7 @@ function importSequenceFromFile(event) {
                     if(bpmInput) bpmInput.value = importedBpm;
                 }
                 if(Number.isFinite(parsed.speedMultiplier)) {
-                    const speedSelect = document.getElementById('speed-select');
-                    state.speedMultiplier = parsed.speedMultiplier;
-                    if(speedSelect) speedSelect.value = String(parsed.speedMultiplier);
+                    state.speedMultiplier = 1.0;
                 }
                 if(Number.isFinite(parsed.visualDelayMs)) {
                     updateVisualDelayUI(parsed.visualDelayMs);
@@ -2351,6 +2645,17 @@ function importSequenceFromFile(event) {
         input.value = '';
     };
     reader.readAsText(file);
+}
+
+function toggleOptions() {
+    const controls = document.getElementById('controls');
+    const btn = document.getElementById('toggle-options-btn');
+    const isCollapsed = controls.classList.toggle('collapsed');
+    if (isCollapsed) {
+        btn.innerHTML = '⚙️ Mostrar Opções';
+    } else {
+        btn.innerHTML = '🙈 Ocultar Opções';
+    }
 }
 
 window.onload = () => {
