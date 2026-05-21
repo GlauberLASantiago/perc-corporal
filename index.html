@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1180,7 +1179,7 @@ function initAudio() {
             delayNode = audioCtx.createDelay(1.0);
             delayNode.delayTime.value = 0.07; // tempo de atraso de 70ms (<100ms)
             delayFeedback = audioCtx.createGain();
-            delayFeedback.gain.value = 0.35; // feedback (realimentação)
+            delayFeedback.gain.value = 0.18; // feedback (realimentação) reduzido
             delayGain = audioCtx.createGain();
             delayGain.gain.value = 0.0; // seco inicialmente no modo solo
             
@@ -1210,8 +1209,8 @@ function initAudio() {
 function updateTurmaEffects() {
     if (!audioCtx || !delayGain || !reverbGain) return;
     if (state.turmaMode) {
-        // Modo turma: delay ativado e reverb ligeiramente aumentado
-        delayGain.gain.setTargetAtTime(0.35, audioCtx.currentTime, 0.05);
+        // Modo turma: delay ativado (reduzido) e reverb ligeiramente aumentado
+        delayGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
         reverbGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
     } else {
         // Modo solo: delay zerado e reverb sutil de sala
@@ -1728,8 +1727,8 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     group.scale.set(scaleParam, scaleParam, scaleParam);
     
     const parts = {
-        L: { armPivot: null, legPivot: null, shinPivot: null, meshes: {} },
-        R: { armPivot: null, legPivot: null, shinPivot: null, meshes: {} }
+        L: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} },
+        R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
     };
 
     const matSkin  = new THREE.MeshStandardMaterial({ color: skinHex,  roughness: 0.5 });
@@ -1808,9 +1807,11 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     nose.position.set(0, -0.6, 5.6);
     head.add(nose);
 
-    // Boca
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 0.3), matMouth);
-    mouth.position.set(0, -2.4, 5.1);
+    // Boca (um pequeno sorriso amigável e sutil)
+    const mouthGeo = new THREE.TorusGeometry(1.2, 0.15, 8, 16, Math.PI * 0.5);
+    const mouth = new THREE.Mesh(mouthGeo, matMouth);
+    mouth.position.set(0, -2.2, 4.4);
+    mouth.rotation.set(-0.39, 0, -Math.PI * 0.75);
     head.add(mouth);
 
     // Orelhas
@@ -1930,20 +1931,43 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         shoulderMesh.castShadow = true;
         armPivot.add(shoulderMesh);
 
-        // Manga da camisa (comprimento 6.5)
-        const sleeveGeo = new THREE.CylinderGeometry(2.2, 2.0, 6.5, 16);
-        sleeveGeo.translate(0, -3.25, 0);
+        // Manga da camisa (comprimento 5.0)
+        const sleeveGeo = new THREE.CylinderGeometry(2.2, 2.0, 5.0, 16);
+        sleeveGeo.translate(0, -2.5, 0);
         const sleeveMesh = new THREE.Mesh(sleeveGeo, matShirt.clone());
         sleeveMesh.castShadow = true;
         armPivot.add(sleeveMesh);
 
-        // Antebraço (pele, comprimento 8.5)
-        const forearmGeo = new THREE.CylinderGeometry(1.7, 1.4, 8.5, 16);
-        forearmGeo.translate(0, -4.25, 0);
+        // Parte superior do braço (pele, comprimento 3.0)
+        const upperArmSkinGeo = new THREE.CylinderGeometry(2.0, 1.8, 3.0, 16);
+        upperArmSkinGeo.translate(0, -1.5, 0);
+        const upperArmSkinMesh = new THREE.Mesh(upperArmSkinGeo, matSkin.clone());
+        upperArmSkinMesh.position.y = -5.0;
+        upperArmSkinMesh.castShadow = true;
+        upperArmSkinMesh.receiveShadow = true;
+        armPivot.add(upperArmSkinMesh);
+
+        // ---- ANTEBRAÇO ----
+        const forearmPivot = new THREE.Group();
+        forearmPivot.position.set(0, -8.0, 0);
+        forearmPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
+        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
+        forearmPivot.userData.isAnimating = false;
+        forearmPivot.userData.animProgress = 0;
+
+        // Articulação do cotovelo (pele)
+        const elbowMesh = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 16), matSkin.clone());
+        elbowMesh.castShadow = true;
+        elbowMesh.receiveShadow = true;
+        forearmPivot.add(elbowMesh);
+
+        // Antebraço (pele, comprimento 7.0)
+        const forearmGeo = new THREE.CylinderGeometry(1.7, 1.4, 7.0, 16);
+        forearmGeo.translate(0, -3.5, 0);
         const forearmMesh = new THREE.Mesh(forearmGeo, matSkin.clone());
-        forearmMesh.position.y = -6.5;
         forearmMesh.castShadow = true;
-        armPivot.add(forearmMesh);
+        forearmMesh.receiveShadow = true;
+        forearmPivot.add(forearmMesh);
 
         const handMat = matSkin.clone();
         
@@ -1952,18 +1976,16 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         palmGeo.translate(0, -2.0, 0); // Pivô no pulso
         
         const handMesh = new THREE.Mesh(palmGeo, handMat);
-        handMesh.position.set(0, -15, 0); 
+        handMesh.position.set(0, -7.0, 0); // Fica na extremidade do antebraço (y = -7)
         setupGlowAndShadow(handMesh);
         
-        // Polegar (Thumb)
         const thumbGeo = new THREE.BoxGeometry(0.75, 1.8, 0.75);
         thumbGeo.translate(0, -0.9, 0); // Pivô na base do polegar
-        
         const thumbMesh = new THREE.Mesh(thumbGeo, handMat);
         // O polegar fica na lateral interna da mão (direção de -sign)
-        thumbMesh.position.set(-sign * 1.6, -1.8, 0.25);
+        thumbMesh.position.set(-sign * 1.6, -1.8, -0.25);
         thumbMesh.rotation.z = sign * 0.45; // Angulado para dentro (direção medial)
-        thumbMesh.rotation.x = -0.3;        // Angulado levemente para a frente
+        thumbMesh.rotation.x = 0.3;         // Angulado levemente para trás (palma para trás)
         thumbMesh.castShadow = true;
         thumbMesh.receiveShadow = true;
         handMesh.add(thumbMesh);
@@ -1990,10 +2012,12 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
             handMesh.add(fingerMesh);
         }
         
-        armPivot.add(handMesh);
+        forearmPivot.add(handMesh);
+        armPivot.add(forearmPivot);
 
         group.add(armPivot);
         parts[side].armPivot = armPivot;
+        parts[side].forearmPivot = forearmPivot;
         parts[side].meshes['Palma']  = handMesh;
         parts[side].meshes['Estalo'] = handMesh; 
 
@@ -2180,6 +2204,13 @@ function triggerAnimation(side, type) {
                 armPivot.userData.isAnimating = true;
                 armPivot.userData.animProgress = 0;
                 armPivot.userData.animType = 'Palma';
+
+                const forearmPivot = avatar.parts[s].forearmPivot;
+                if (forearmPivot) {
+                    forearmPivot.userData.isAnimating = true;
+                    forearmPivot.userData.animProgress = 0;
+                    forearmPivot.userData.animType = 'Palma';
+                }
             });
             return; 
         }
@@ -2197,22 +2228,29 @@ function triggerAnimation(side, type) {
             mesh.material.emissiveIntensity = 1.0;
         }
 
-        const armPivot = avatar.parts[side].armPivot;
-        const legPivot = avatar.parts[side].legPivot;
-        
-        armPivot.userData.isAnimating = true;
-        armPivot.userData.animProgress = 0;
-        armPivot.userData.animType = type;
-        
-        legPivot.userData.isAnimating = true;
-        legPivot.userData.animProgress = 0;
-        legPivot.userData.animType = type;
+        if (type !== 'Pé') {
+            const armPivot = avatar.parts[side].armPivot;
+            armPivot.userData.isAnimating = true;
+            armPivot.userData.animProgress = 0;
+            armPivot.userData.animType = type;
 
-        // Para 'Pé', animar também a canela (shinPivot)
-        const shinPivot = avatar.parts[side].shinPivot;
-        shinPivot.userData.isAnimating = true;
-        shinPivot.userData.animProgress = 0;
-        shinPivot.userData.animType = type;
+            const forearmPivot = avatar.parts[side].forearmPivot;
+            if (forearmPivot) {
+                forearmPivot.userData.isAnimating = true;
+                forearmPivot.userData.animProgress = 0;
+                forearmPivot.userData.animType = type;
+            }
+        } else {
+            const legPivot = avatar.parts[side].legPivot;
+            legPivot.userData.isAnimating = true;
+            legPivot.userData.animProgress = 0;
+            legPivot.userData.animType = type;
+
+            const shinPivot = avatar.parts[side].shinPivot;
+            shinPivot.userData.isAnimating = true;
+            shinPivot.userData.animProgress = 0;
+            shinPivot.userData.animType = type;
+        }
     });
 }
 
@@ -2323,7 +2361,14 @@ function animate3D() {
                 armPivot.rotation.z += (armPivot.userData.restingRot.z - armPivot.rotation.z) * 0.2;
             }
 
-            // Animação do braço
+            // Articulação do cotovelo na caminhada se não estiver em animação (curva para a frente, ou seja, rotation.x negativa)
+            const forearmPivot = avatar.parts[side].forearmPivot;
+            if (forearmPivot && !forearmPivot.userData.isAnimating) {
+                const walkElbow = walkingIntensity > 0.01 ? -(0.15 + Math.abs(swing) * 0.3) : 0;
+                forearmPivot.rotation.x += (walkElbow - forearmPivot.rotation.x) * 0.2;
+            }
+
+            // Animação do braço (ombro)
             if (armPivot.userData.isAnimating) {
                 armPivot.userData.animProgress += 0.12; 
                 if (armPivot.userData.animProgress >= 1) {
@@ -2334,14 +2379,36 @@ function animate3D() {
                     const bounce = Math.sin(p * Math.PI); 
                     let targetX = 0, targetZ = armPivot.userData.restingRot.z;
                     switch(armPivot.userData.animType) {
-                        case 'Peito':  targetX = -1.5; targetZ = sign * -1.0; break; 
-                        case 'Palma':  targetX = -1.0; targetZ = sign * -0.7; break; 
-                        case 'Estalo': targetX = -2.0; targetZ = sign *  0.4; break; 
-                        case 'Coxa':   targetX = -0.3; targetZ = 0;           break; 
-                        case 'Pé':     targetX = -0.3; targetZ = sign *  0.2; break; 
+                        case 'Peito':  targetX = -1.0; targetZ = sign * 0.4;  break; // Cotovelo para fora
+                        case 'Palma':  targetX = -0.8; targetZ = sign * -0.8; break; // Braços para frente/dentro
+                        case 'Estalo': targetX = -1.0; targetZ = sign * 0.8;  break; // Mais para cima e mais para fora/longe
+                        case 'Coxa':   targetX = 0.3;  targetZ = sign * -0.2; break; // Mão vai para baixo/trás-coxa
+                        case 'Pé':     targetX = -0.3; targetZ = sign * 0.2;  break; // Balanço
                     }
                     armPivot.rotation.x = armPivot.userData.restingRot.x + (targetX - armPivot.userData.restingRot.x) * bounce;
                     armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
+                }
+            }
+
+            // Animação do antebraço (cotovelo)
+            if (forearmPivot && forearmPivot.userData.isAnimating) {
+                forearmPivot.userData.animProgress += 0.12;
+                if (forearmPivot.userData.animProgress >= 1) {
+                    forearmPivot.userData.isAnimating = false;
+                    forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
+                } else {
+                    const p      = forearmPivot.userData.animProgress;
+                    const bounce = Math.sin(p * Math.PI);
+                    let targetX = 0, targetZ = forearmPivot.userData.restingRot.z;
+                    switch(forearmPivot.userData.animType) {
+                        case 'Peito':  targetX = -1.6; targetZ = sign * -0.8; break; // Dobra cotovelo a 90+ graus para frente
+                        case 'Palma':  targetX = -0.8; targetZ = sign * -0.4; break; // Dobra cotovelo levemente para frente
+                        case 'Estalo': targetX = -0.8; targetZ = sign * 0.2;  break; // Mais para cima e mais para fora/longe
+                        case 'Coxa':   targetX = -1.0; targetZ = sign * -0.4; break; // Dobra cotovelo em direção à coxa para frente
+                        case 'Pé':     targetX = -0.2; targetZ = 0;           break; // Dobra cotovelo levemente para frente
+                    }
+                    forearmPivot.rotation.x = forearmPivot.userData.restingRot.x + (targetX - forearmPivot.userData.restingRot.x) * bounce;
+                    forearmPivot.rotation.z = forearmPivot.userData.restingRot.z + (targetZ - forearmPivot.userData.restingRot.z) * bounce;
                 }
             }
 
@@ -2355,9 +2422,8 @@ function animate3D() {
                     const p      = legPivot.userData.animProgress;
                     const bounce = Math.sin(p * Math.PI);
                     let targetX = 0;
-                    switch(legPivot.userData.animType) {
-                        case 'Pé':   targetX = -0.5; break;
-                        case 'Coxa': targetX = -0.35; break;
+                    if (legPivot.userData.animType === 'Pé') {
+                        targetX = -0.5;
                     }
                     legPivot.rotation.x = legPivot.userData.restingRot.x + (targetX - legPivot.userData.restingRot.x) * bounce;
                 }
