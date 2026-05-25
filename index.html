@@ -141,6 +141,14 @@
         }
 
         .library-title { font-size: 0.9em; font-weight: bold; text-transform: uppercase; color: #888; text-align: center; }
+        .library-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .library-section:not(:first-child) {
+            margin-top: 15px;
+        }
         .step-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
         .step-btn {
@@ -501,22 +509,188 @@
         #footer-credits a:hover { text-decoration: underline; }
 
         @media (max-width: 768px) {
+            :root { --cell-size: 20px; }
+
             #main-workspace.open { flex-direction: column; }
-            #library { width: 100%; min-width: 100%; border-right: none; border-bottom: 2px solid var(--ui-border); max-height: 200px; }
+            
+            #library { 
+                display: flex !important;
+                flex-direction: row !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                width: 100% !important; 
+                min-width: 100% !important; 
+                border-right: none !important; 
+                border-bottom: 2px solid var(--ui-border) !important; 
+                max-height: 85px !important; 
+                padding: 4px 8px !important;
+                gap: 15px !important;
+            }
 
-            #score-panel { width: 100%; min-width: 100%; max-width: none; border-left: none; border-top: 2px solid var(--ui-border); max-height: 260px; }
-            #body-score-svg { width: max(100%, 640px); }
+            .library-section {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 2px !important;
+                flex-shrink: 0 !important;
+            }
 
-            .step-group { display: flex; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; gap: 8px; }
-            .step-btn { flex: 0 0 75px; }
-            .move-grid { display: grid; grid-template-columns: repeat(3, 1fr); overflow-x: visible; }
-            .move-grid .step-btn { flex: initial; }
-            #stage-container { flex: 0 0 35vh; min-height: 35vh; }
-            .timeline-header, .timeline-row { grid-template-columns: 40px repeat(32, 35px); }
-            :root { --cell-size: 35px; }
-            #playhead { left: 60px; }
-            #hint { display: none; }
-    
+            .library-section:not(:first-child) {
+                margin-top: 0 !important;
+            }
+
+            .library-title {
+                font-size: 8px !important;
+                margin-top: 0 !important;
+                margin-bottom: 2px !important;
+            }
+
+            #score-panel { 
+                width: 100%; 
+                min-width: 100%; 
+                max-width: none; 
+                border-left: none; 
+                border-top: 2px solid var(--ui-border); 
+                max-height: 180px !important; 
+                padding: 8px !important;
+            }
+
+            #body-score-svg { 
+                width: max(100%, 540px); 
+            }
+
+            .step-group { 
+                display: flex !important; 
+                flex-direction: row !important;
+                gap: 3px !important; 
+                padding-bottom: 0 !important;
+            }
+
+            .step-btn { 
+                flex: 0 0 auto !important; 
+                width: 46px !important;
+                height: 28px !important;
+                padding: 2px 4px !important; 
+                font-size: 9px !important;
+                border-radius: 4px !important;
+            }
+
+            .move-grid { 
+                display: grid !important; 
+                grid-template-columns: repeat(3, 20px) !important; 
+                gap: 1.5px !important;
+            }
+
+            .move-grid .step-btn { 
+                width: 20px !important;
+                height: 18px !important;
+                font-size: 8px !important;
+                padding: 0 !important;
+                line-height: 18px !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+            }
+
+            #stage-container { 
+                flex: 0 0 20vh; 
+                min-height: 20vh; 
+            }
+
+            .timeline-header, .timeline-row { 
+                grid-template-columns: 35px repeat(32, var(--cell-size)); 
+                gap: 1.5px !important;
+                margin-bottom: 2px !important;
+            }
+
+            #timeline-wrapper {
+                padding: 4px 6px !important;
+            }
+
+            .time-cell {
+                height: 24px !important;
+                font-size: 9px !important;
+                border-radius: 3px !important;
+            }
+
+            .row-label {
+                font-size: 9px !important;
+                padding-right: 4px !important;
+                line-height: 24px !important;
+            }
+
+            #playhead { 
+                left: 46px; 
+            }
+
+            #hint { 
+                display: none; 
+            }
+            
+            #controls {
+                padding: 4px !important;
+                gap: 3px !important;
+                justify-content: center;
+            }
+
+            #controls button, #controls select {
+                padding: 4px 6px !important;
+                font-size: 10px !important;
+                border-radius: 4px !important;
+            }
+
+            #controls select {
+                height: 24px !important;
+                padding: 2px 4px !important;
+            }
+
+            .bpm-control-wrapper input {
+                padding: 2px 0 !important;
+                font-size: 10px !important;
+                width: 28px !important;
+            }
+
+            .bpm-control-wrapper button {
+                padding: 2px 5px !important;
+            }
+
+            #controls .control-item {
+                padding: 2px 4px !important;
+                border-radius: 4px !important;
+                gap: 3px !important;
+            }
+            #controls .control-item label {
+                font-size: 10px !important;
+            }
+            #controls .control-item svg {
+                width: 12px !important;
+                height: 12px !important;
+            }
+            #visual-delay-slider {
+                width: 45px !important;
+            }
+            #visual-delay-label {
+                font-size: 10px !important;
+                min-width: 35px !important;
+            }
+            #melody-scale-select {
+                height: 24px !important;
+                font-size: 10px !important;
+                padding: 2px 4px !important;
+                margin-left: 2px !important;
+            }
+
+            #glossary-panel { 
+                max-height: 70vh; 
+                overflow-y: auto; 
+            }
+
+            #footer-credits {
+                padding: 4px !important;
+                font-size: 9px !important;
+                line-height: 1.2 !important;
+            }
+        }
 
         #score-panel {
             width: 330px;
@@ -565,14 +739,6 @@
         }
 
         .score-legend span { white-space: nowrap; }
-
-        #controls {
-                padding: 8px;
-                gap: 6px;
-                justify-content: center;
-            }
-            #glossary-panel { max-height: 80vh; overflow-y: auto; }
-        }
     
 
         /* Partitura em janela flutuante: oculta por padrão */
@@ -671,37 +837,43 @@
 
     <div id="main-workspace">
         <div id="library">
-            <div class="library-title">Sons Corporais</div>
-            <div class="step-group">
-                <div class="step-btn body" draggable="true" data-type="Pé">🦶 Pé</div>
-                <div class="step-btn body" draggable="true" data-type="Coxa">🦵 Coxa</div>
-                <div class="step-btn body" draggable="true" data-type="Peito">🫁 Peito</div>
-                <div class="step-btn body" draggable="true" data-type="Palma">👏 Palma</div>
-                <div class="step-btn body" draggable="true" data-type="Estalo">🫰 Estalo</div>
+            <div class="library-section">
+                <div class="library-title">Sons Corporais</div>
+                <div class="step-group">
+                    <div class="step-btn body" draggable="true" data-type="Pé">🦶 Pé</div>
+                    <div class="step-btn body" draggable="true" data-type="Coxa">🦵 Coxa</div>
+                    <div class="step-btn body" draggable="true" data-type="Peito">🫁 Peito</div>
+                    <div class="step-btn body" draggable="true" data-type="Palma">👏 Palma</div>
+                    <div class="step-btn body" draggable="true" data-type="Estalo">🫰 Estalo</div>
+                </div>
             </div>
-            <div class="library-title" style="margin-top: 15px;">Deslocamento</div>
-            <div class="step-group move-grid" aria-label="Rosa dos ventos para deslocamento">
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↖" title="Mover na diagonal frente-esquerda">↖</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↑" title="Mover para frente">↑</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↗" title="Mover na diagonal frente-direita">↗</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="←" title="Mover para a esquerda">←</div>
-                <div class="step-btn move move-reset" draggable="true" data-type="Move" data-val="X" title="Voltar à posição inicial">X</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="→" title="Mover para a direita">→</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↙" title="Mover na diagonal trás-esquerda">↙</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↓" title="Mover para trás">↓</div>
-                <div class="step-btn move" draggable="true" data-type="Move" data-val="↘" title="Mover na diagonal trás-direita">↘</div>
+            <div class="library-section">
+                <div class="library-title">Deslocamento</div>
+                <div class="step-group move-grid" aria-label="Rosa dos ventos para deslocamento">
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↖" title="Mover na diagonal frente-esquerda">↖</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↑" title="Mover para frente">↑</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↗" title="Mover na diagonal frente-direita">↗</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="←" title="Mover para a esquerda">←</div>
+                    <div class="step-btn move move-reset" draggable="true" data-type="Move" data-val="X" title="Voltar à posição inicial">X</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="→" title="Mover para a direita">→</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↙" title="Mover na diagonal trás-esquerda">↙</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↓" title="Mover para trás">↓</div>
+                    <div class="step-btn move" draggable="true" data-type="Move" data-val="↘" title="Mover na diagonal trás-direita">↘</div>
+                </div>
             </div>
-            <div class="library-title" style="margin-top: 15px;">Giro do Corpo</div>
-            <div class="step-group move-grid" aria-label="Rosa dos ventos para giro">
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↖" title="Girar na diagonal frente-esquerda">↖</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↑" title="Girar para frente">↑</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↗" title="Girar na diagonal frente-direita">↗</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="←" title="Girar para a esquerda">←</div>
-                <div class="step-btn pos pos-reset" draggable="true" data-type="Pos" data-val="X" title="Voltar à orientação inicial">X</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="→" title="Girar para a direita">→</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↙" title="Girar na diagonal trás-esquerda">↙</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↓" title="Girar para trás">↓</div>
-                <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↘" title="Girar na diagonal trás-direita">↘</div>
+            <div class="library-section">
+                <div class="library-title">Giro do Corpo</div>
+                <div class="step-group move-grid" aria-label="Rosa dos ventos para giro">
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↖" title="Girar na diagonal frente-esquerda">↖</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↑" title="Girar para frente">↑</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↗" title="Girar na diagonal frente-direita">↗</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="←" title="Girar para a esquerda">←</div>
+                    <div class="step-btn pos pos-reset" draggable="true" data-type="Pos" data-val="X" title="Voltar à orientação inicial">X</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="→" title="Girar para a direita">→</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↙" title="Girar na diagonal trás-esquerda">↙</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↓" title="Girar para trás">↓</div>
+                    <div class="step-btn pos" draggable="true" data-type="Pos" data-val="↘" title="Girar na diagonal trás-direita">↘</div>
+                </div>
             </div>
         </div>
 
@@ -1643,7 +1815,8 @@ function stopPlayback() {
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
     document.querySelectorAll('.time-cell').forEach(c => c.classList.remove('playing'));
-    document.getElementById('playhead').style.left = '65px'; 
+    const isMobile = window.innerWidth <= 768;
+    document.getElementById('playhead').style.left = isMobile ? '46px' : '65px'; 
     renderBodyScoreUI(null);
     state.currentStep = 0;
 }
