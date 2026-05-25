@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -596,14 +597,6 @@
             background: #fffdf8;
         }
 
-        #score-panel.score-window-open::before {
-            content: '';
-            position: fixed;
-            inset: -100vh -100vw;
-            background: rgba(0, 0, 0, 0.28);
-            z-index: -1;
-        }
-
         .score-window-header {
             display: flex;
             align-items: center;
@@ -614,6 +607,8 @@
             background: #fffdf8;
             padding: 2px 0 8px;
             z-index: 1;
+            cursor: move;
+            user-select: none;
         }
 
         .score-close-btn {
@@ -723,17 +718,11 @@
 
         <aside id="score-panel" aria-label="Partitura equivalente da percussão corporal" aria-hidden="true">
             <div class="score-window-header">
-                <div class="score-title">Partitura corporal</div>
+                <div class="score-title">Partitura</div>
                 <button id="score-close-btn" class="score-close-btn" type="button" title="Fechar partitura">×</button>
             </div>
-            <div class="score-subtitle">Janela flutuante com uma linha central por voz de percussão corporal e pausas com grafia mais próxima da notação real. Exibe só Pé, Coxa, Peito, Palma e Estalo; giro e deslocamento ficam fora.</div>
             <svg id="body-score-svg" role="img" aria-label="Partitura rítmica da percussão corporal"></svg>
-            <div class="score-legend">
-                <span>🫰 Estalo</span><span>👏 Palma</span>
-                <span>🫁 Peito</span><span>🦵 Coxa</span>
-                <span>🦶 Pé</span><span>E/D = lado</span>
-                <span>1 linha central por voz</span><span>compasso vazio 4/4 = semibreve</span>
-            </div>
+
         </aside>
     </div>
 
@@ -772,7 +761,7 @@
         <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
         <button id="export-btn">📤 Exportar rítmos</button>
         <button id="export-midi-btn">🎼 Exportar MIDI</button>
-        <button id="export-image-btn">🖼️ Exportar Imagem</button>
+        <button id="export-image-btn">🎓 Gerar Certificado</button>
 
         <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
         <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Melodia: OFF</button>
@@ -1639,12 +1628,63 @@ function initUI() {
     const scorePanel = document.getElementById('score-panel');
     const scoreCloseBtn = document.getElementById('score-close-btn');
 
+    function makeElementDraggable(dragEl, handleEl) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        handleEl.onmousedown = dragMouseDown;
+
+        function dragMouseDown(e) {
+            e = e || window.event;
+            if (e.target.id === 'score-close-btn') return;
+            e.preventDefault();
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+        }
+
+        function elementDrag(e) {
+            e = e || window.event;
+            e.preventDefault();
+            pos1 = pos3 - e.clientX;
+            pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+
+            const rect = dragEl.getBoundingClientRect();
+            if (dragEl.style.transform === '' || dragEl.style.transform.includes('translate')) {
+                dragEl.style.transform = 'none';
+                dragEl.style.top = rect.top + 'px';
+                dragEl.style.left = rect.left + 'px';
+                dragEl.style.margin = '0';
+            }
+
+            dragEl.style.top = (dragEl.offsetTop - pos2) + "px";
+            dragEl.style.left = (dragEl.offsetLeft - pos1) + "px";
+        }
+
+        function closeDragElement() {
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+    if (scorePanel) {
+        const scoreHeader = scorePanel.querySelector('.score-window-header');
+        if (scoreHeader) {
+            makeElementDraggable(scorePanel, scoreHeader);
+        }
+    }
+
     function setScoreWindowOpen(isOpen) {
         if (!scorePanel || !toggleScoreBtn) return;
         scorePanel.classList.toggle('score-window-open', isOpen);
         scorePanel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
         toggleScoreBtn.innerHTML = isOpen ? '🎼 Fechar partitura' : '🎼 Abrir partitura';
         if (isOpen) {
+            scorePanel.style.transform = '';
+            scorePanel.style.top = '';
+            scorePanel.style.left = '';
+            scorePanel.style.margin = '';
             renderBodyScoreUI(currentStep >= 0 ? currentStep : null);
         }
     }
@@ -1958,6 +1998,10 @@ function getBodyEventForRowAtStep(stepData, rowType) {
 }
 
 function getDurationInfoFromUnits(units) {
+    if (units >= 16) return { units: 16, name: 'Semibreve', flagCount: 0, dotted: false };
+    if (units === 12) return { units: 12, name: 'Mínima pontuada', flagCount: 0, dotted: true };
+    if (units >= 8) return { units: 8, name: 'Mínima', flagCount: 0, dotted: false };
+    if (units === 6) return { units: 6, name: 'Semínima pontuada', flagCount: 0, dotted: true };
     if (units >= 4) return { units: 4, name: 'Semínima', flagCount: 0, dotted: false };
     if (units === 3) return { units: 3, name: 'Colcheia pontuada', flagCount: 1, dotted: true };
     if (units === 2) return { units: 2, name: 'Colcheia', flagCount: 1, dotted: false };
@@ -2032,49 +2076,109 @@ function buildBeatElements(eventsInBeat) {
     return elements;
 }
 
-function drawRhythmNote(svg, x, y, durationInfo, color = '#212529') {
+function drawRhythmNote(svg, x, y, durationInfo, color = '#212529', forceUnflagged = false) {
     const noteGroup = createSvgEl('g', { 'aria-label': durationInfo.name });
     svg.appendChild(noteGroup);
 
-    const noteHead = createSvgEl('ellipse', {
-        cx: x,
-        cy: y,
-        rx: 5.4,
-        ry: 3.8,
-        transform: `rotate(-18 ${x} ${y})`,
-        fill: color
-    });
-    noteGroup.appendChild(noteHead);
+    // Mapeamento dos caracteres Unicode conforme fornecido pelo usuário:
+    // Semibreve: 𝅝 (&#x1D15D;), Mínima: 𝅗𝅥 (&#x1D15E;), Semínima: 𝅘𝅥 (&#x1D15F;), Colcheia: 𝅘𝅥𝅮 (&#x1D160;), Semicolcheia: 𝅘𝅥𝅯 (&#x1D161;)
+    let glyph = '𝅘𝅥';
+    let fontSize = 38;
+    let verticalOffset = 4; // Ajuste para alinhar a cabeça da nota com a linha da pauta (y)
 
-    const stemTop = Math.max(14, y - 24);
-    const stemX = x + 5.2;
-    noteGroup.appendChild(createSvgEl('line', {
-        x1: stemX,
-        y1: y,
-        x2: stemX,
-        y2: stemTop,
-        stroke: color,
-        'stroke-width': 1.6,
-        'stroke-linecap': 'round'
-    }));
-
-    if (durationInfo.dotted) {
-        noteGroup.appendChild(createSvgEl('circle', { cx: x + 11, cy: y - 1, r: 1.6, fill: color }));
+    const name = durationInfo.name || '';
+    if (name.includes('Semibreve')) {
+        glyph = '𝅝';
+        fontSize = 28;
+        verticalOffset = -3; // Semibreve não tem haste, fica centralizada se deslocada levemente
+    } else if (name.includes('Mínima')) {
+        glyph = '𝅗𝅥';
+        fontSize = 38;
+        verticalOffset = 4;
+    } else {
+        // Se forceUnflagged for verdadeiro (ex: notas ligadas por barra), usamos a semínima 𝅘𝅥 (haste sem colchete)
+        glyph = forceUnflagged ? '𝅘𝅥' : (name.includes('Semicolcheia') ? '𝅘𝅥𝅯' : (name.includes('Colcheia') ? '𝅘𝅥𝅮' : '𝅘𝅥'));
+        fontSize = 38;
+        verticalOffset = 4;
     }
 
-    for (let flag = 0; flag < durationInfo.flagCount; flag++) {
-        const yStart = stemTop + flag * 6;
-        const path = `M ${stemX} ${yStart} C ${stemX + 9} ${yStart + 2}, ${stemX + 11} ${yStart + 8}, ${stemX + 4} ${yStart + 11}`;
-        noteGroup.appendChild(createSvgEl('path', {
-            d: path,
-            fill: 'none',
-            stroke: color,
-            'stroke-width': 1.5,
-            'stroke-linecap': 'round'
-        }));
+    const textEl = createSvgEl('text', {
+        x: x - 5.5,
+        y: y + verticalOffset,
+        'font-size': fontSize,
+        'font-family': '"Noto Music","Segoe UI Symbol","Arial Unicode MS",serif',
+        fill: color
+    });
+    textEl.textContent = glyph;
+    noteGroup.appendChild(textEl);
+
+    if (durationInfo.dotted) {
+        // Posição do ponto de aumento ao lado da cabeça da nota
+        const dotX = x + 10;
+        const dotY = y - 1;
+        noteGroup.appendChild(createSvgEl('circle', { cx: dotX, cy: dotY, r: 1.6, fill: color }));
     }
 
     return noteGroup;
+}
+
+function drawBeams(svg, centerY, notePositions) {
+    if (notePositions.length < 2) return;
+
+    notePositions.sort((a, b) => a.x - b.x);
+
+    const stemXOffset = 7.3;
+    const primaryBeamY = centerY - 33;
+    const secondaryBeamY = centerY - 28;
+    const beamThickness = 3.5;
+
+    // 1. Desenha a barra de ligação principal (primary beam) conectando todas as notas do grupo
+    const startX = notePositions[0].x + stemXOffset;
+    const endX = notePositions[notePositions.length - 1].x + stemXOffset;
+    svg.appendChild(createSvgEl('line', {
+        x1: startX,
+        y1: primaryBeamY,
+        x2: endX,
+        y2: primaryBeamY,
+        stroke: '#212529',
+        'stroke-width': beamThickness,
+        class: 'beam-line'
+    }));
+
+    // 2. Desenha a segunda barra (secondary beam) para as semicolcheias
+    for (let i = 0; i < notePositions.length; i++) {
+        const current = notePositions[i];
+        if (current.isSixteenth) {
+            // Se a próxima nota também for semicolcheia, conecta a barra secundária com ela
+            if (i < notePositions.length - 1 && notePositions[i + 1].isSixteenth) {
+                const nextX = notePositions[i + 1].x + stemXOffset;
+                svg.appendChild(createSvgEl('line', {
+                    x1: current.x + stemXOffset,
+                    y1: secondaryBeamY,
+                    x2: nextX,
+                    y2: secondaryBeamY,
+                    stroke: '#212529',
+                    'stroke-width': beamThickness,
+                    class: 'beam-line'
+                }));
+            } else if (i > 0 && notePositions[i - 1].isSixteenth) {
+                // Já conectada à semicolcheia anterior, não faz nada
+            } else {
+                // Semicolcheia isolada entre colcheias: desenha uma meia-barra (fractional beam) de 6px
+                const direction = (i === 0) ? 1 : -1; // para a direita se for a primeira, para a esquerda caso contrário
+                const fracEndX = current.x + stemXOffset + (direction * 6);
+                svg.appendChild(createSvgEl('line', {
+                    x1: current.x + stemXOffset,
+                    y1: secondaryBeamY,
+                    x2: fracEndX,
+                    y2: secondaryBeamY,
+                    stroke: '#212529',
+                    'stroke-width': beamThickness,
+                    class: 'beam-line'
+                }));
+            }
+        }
+    }
 }
 
 function drawRestGlyph(svg, x, y, glyph, color = '#6c757d', fontSize = 28, dotted = false, dotDx = 11, dotDy = -2) {
@@ -2086,7 +2190,7 @@ function drawRestGlyph(svg, x, y, glyph, color = '#6c757d', fontSize = 28, dotte
         'text-anchor': 'middle',
         'dominant-baseline': 'middle',
         'font-size': fontSize,
-        'font-family': '"Bravura Text","Noto Music","Segoe UI Symbol","Arial Unicode MS",serif',
+        'font-family': '"Noto Music","Segoe UI Symbol","Arial Unicode MS",serif',
         fill: color
     });
     textEl.textContent = glyph;
@@ -2114,21 +2218,32 @@ function drawFlaggedRest(svg, x, y, flagCount = 1, color = '#6c757d', dotted = f
 }
 
 function drawWholeMeasureRest(svg, x, centerY, color = '#6c757d') {
-    const g = createSvgEl('g', { 'aria-label': 'Pausa de semibreve' });
-    svg.appendChild(g);
     // Em pauta de uma linha, a pausa de semibreve fica pendurada logo abaixo da linha central.
-    g.appendChild(createSvgEl('rect', {
-        x: x - 10,
-        y: centerY + 0.5,
-        width: 20,
-        height: 6,
-        fill: color,
-        rx: 1.2
-    }));
+    // Usando Noto Music e o caractere 𝄻 (&#x1D13B;)
+    const g = drawRestGlyph(svg, x, centerY, '𝄻', color, 28, false);
+    g.setAttribute('aria-label', 'Pausa de semibreve');
     return g;
 }
 
 function drawRhythmRest(svg, x, y, durationInfo, color = '#6c757d') {
+    if (durationInfo.units >= 16) {
+        // Pausa de semibreve
+        const g = drawRestGlyph(svg, x, y, '𝄻', color, 28, durationInfo.dotted, 12, -4);
+        g.setAttribute('aria-label', durationInfo.dotted ? 'Pausa de semibreve pontuada' : 'Pausa de semibreve');
+        return g;
+    }
+    if (durationInfo.units >= 8) {
+        // Pausa de mínima
+        const g = drawRestGlyph(svg, x, y, '𝄼', color, 28, durationInfo.dotted, 12, -4);
+        g.setAttribute('aria-label', durationInfo.dotted ? 'Pausa de mínima pontuada' : 'Pausa de mínima');
+        return g;
+    }
+    if (durationInfo.units === 6) {
+        // Pausa de semínima pontuada (para o compasso 6/8)
+        const g = drawRestGlyph(svg, x, y + 1, '𝄽', color, 28, true, 12, -4);
+        g.setAttribute('aria-label', 'Pausa de semínima pontuada');
+        return g;
+    }
     if (durationInfo.units >= 4) {
         return drawQuarterRest(svg, x, y, color);
     }
@@ -2149,9 +2264,9 @@ function renderBodyScoreUI(activeStep = null) {
     const topPad = 24;
     const staffBlockHeight = 34;
     const staffGap = 18;
-    const bottomPad = 58;
+    const bottomPad = 20;
     const stepWidth = cfg.pulseSteps === 6 ? 14 : 18;
-    const width = Math.max(620, leftPad + rightPad + (state.totalSteps * stepWidth) + 22);
+    const width = leftPad + rightPad + (state.totalSteps * stepWidth);
     const totalStaffHeight = (scoreBodyRows.length * staffBlockHeight) + ((scoreBodyRows.length - 1) * staffGap);
     const height = topPad + totalStaffHeight + bottomPad;
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -2187,6 +2302,7 @@ function renderBodyScoreUI(activeStep = null) {
 
     staffMeta.forEach(({ row, lineYs, centerY }) => {
         lineYs.forEach((y) => {
+            // Linha principal da pauta (cinza)
             svg.appendChild(createSvgEl('line', {
                 x1: leftPad,
                 y1: y,
@@ -2195,7 +2311,10 @@ function renderBodyScoreUI(activeStep = null) {
                 stroke: '#adb5bd',
                 'stroke-width': 1.35
             }));
+
+
         });
+
         addSvgText(svg, row.label, 8, centerY + 4, {
             'font-size': 11,
             'font-weight': '700',
@@ -2283,51 +2402,194 @@ function renderBodyScoreUI(activeStep = null) {
             for (let beatIndex = 0; beatIndex < beatsInMeasure; beatIndex++) {
                 const beatStart = measureStart + beatIndex * cfg.pulseSteps;
                 const beatEvents = [];
-                for (let local = 0; local < Math.min(4, measureEnd - beatStart); local++) {
+                for (let local = 0; local < Math.min(cfg.pulseSteps, measureEnd - beatStart); local++) {
                     beatEvents.push(getBodyEventForRowAtStep(state.sequence[beatStart + local], row.type));
+                }
+
+                if (cfg.pulseSteps === 6) {
+                    // Lógica dedicada para compasso 6/8: cada beat composto cabe 3 colcheias
+                    const noteIndices = [];
+                    for (let i = 0; i < 6; i++) {
+                        if (beatEvents[i]) {
+                            noteIndices.push(i);
+                        }
+                    }
+
+                    if (noteIndices.length === 0) {
+                        // Beat inteiramente vazio: desenha uma pausa de semínima pontuada
+                        const x = leftPad + beatStart * stepWidth + stepWidth / 2;
+                        drawRhythmRest(svg, x, centerY, getDurationInfoFromUnits(6), '#7f8c8d');
+                    } else if (noteIndices.length === 1 && noteIndices[0] === 0) {
+                        // Apenas a primeira célula tem nota: desenha uma semínima pontuada
+                        const x = leftPad + beatStart * stepWidth + stepWidth / 2;
+                        const event = beatEvents[0];
+                        drawRhythmNote(svg, x, centerY, getDurationInfoFromUnits(6), '#212529', false);
+                        const sideColor = event.sides === 'E' ? '#00796b' : (event.sides === 'D' ? '#d84315' : '#212529');
+                        addSvgText(svg, event.sides, x - 3, centerY + 18, { 'font-size': 8, 'font-weight': '700', fill: sideColor });
+                    } else if (noteIndices.length === 1 && (noteIndices[0] === 4 || noteIndices[0] === 5)) {
+                        // Apenas uma nota no terceiro terço do tempo: desenha uma pausa de semínima no início (duração 4) e uma colcheia (duração 2)
+                        const noteLocal = noteIndices[0];
+                        const event = beatEvents[noteLocal];
+                        
+                        // Desenha a pausa de semínima no início (local 0)
+                        const xRest = leftPad + beatStart * stepWidth + stepWidth / 2;
+                        drawRhythmRest(svg, xRest, centerY, getDurationInfoFromUnits(4), '#7f8c8d');
+                        
+                        // Desenha a nota de colcheia no terceiro terço
+                        const xNote = leftPad + (beatStart + noteLocal) * stepWidth + stepWidth / 2 - 12;
+                        drawRhythmNote(svg, xNote, centerY, getDurationInfoFromUnits(2), '#212529', false);
+                        
+                        const sideColor = event.sides === 'E' ? '#00796b' : (event.sides === 'D' ? '#d84315' : '#212529');
+                        addSvgText(svg, event.sides, xNote - 3, centerY + 18, { 'font-size': 8, 'font-weight': '700', fill: sideColor });
+                    } else {
+                        // Caso geral: cada beat comporta 3 colcheias (notas ou pausas)
+                        // Dividimos em 3 slots de 2 passos: [0, 1], [2, 3], [4, 5]
+                        const slots = [
+                            { start: 0, indices: [0, 1] },
+                            { start: 2, indices: [2, 3] },
+                            { start: 4, indices: [4, 5] }
+                        ];
+
+                        const activeNotes = [];
+                        const notesToRender = [];
+
+                        slots.forEach(slot => {
+                            let foundIndex = -1;
+                            for (let idx of slot.indices) {
+                                if (beatEvents[idx]) {
+                                    foundIndex = idx;
+                                    break;
+                                }
+                            }
+
+                            if (foundIndex !== -1) {
+                                activeNotes.push({ local: foundIndex, event: beatEvents[foundIndex] });
+                            } else {
+                                notesToRender.push({ kind: 'rest', local: slot.start });
+                            }
+                        });
+
+                        // Se houver 2 ou mais notas ativas, liga-as com barras de ligação (beam)
+                        const shouldBeam = activeNotes.length >= 2;
+                        const notePositions = [];
+
+                        // Desenha as notas e coleta posições
+                        activeNotes.forEach(note => {
+                            let x = leftPad + (beatStart + note.local) * stepWidth + stepWidth / 2;
+                            if (note.local > 0) {
+                                x -= 12;
+                            }
+                            drawRhythmNote(svg, x, centerY, getDurationInfoFromUnits(2), '#212529', shouldBeam);
+                            const sideColor = note.event.sides === 'E' ? '#00796b' : (note.event.sides === 'D' ? '#d84315' : '#212529');
+                            addSvgText(svg, note.event.sides, x - 3, centerY + 18, { 'font-size': 8, 'font-weight': '700', fill: sideColor });
+
+                            if (shouldBeam) {
+                                notePositions.push({
+                                    x: x,
+                                    isSixteenth: false // são todas colcheias em 6/8
+                                });
+                            }
+                        });
+
+                        // Desenha as pausas de colcheia nos slots vazios
+                        notesToRender.forEach(rest => {
+                            let x = leftPad + (beatStart + rest.local) * stepWidth + stepWidth / 2;
+                            if (rest.local > 0) {
+                                x -= 12;
+                            }
+                            drawRhythmRest(svg, x, centerY, getDurationInfoFromUnits(2), '#7f8c8d');
+                        });
+
+                        if (shouldBeam) {
+                            drawBeams(svg, centerY, notePositions);
+                        }
+                    }
+                    continue;
                 }
 
                 if (cfg.pulseSteps !== 4 || beatEvents.length < 4) {
                     // fallback simples para compassos compostos ou incompletos
+                    const shortNotes = [];
                     beatEvents.forEach((event, local) => {
-                        const x = leftPad + (beatStart + local) * stepWidth + stepWidth / 2;
                         if (event) {
-                            const durationInfo = local === 0 ? getDurationInfoFromUnits(4) : (local === 2 ? getDurationInfoFromUnits(2) : getDurationInfoFromUnits(1));
-                            drawRhythmNote(svg, x, centerY, durationInfo, '#212529');
-                            const sideColor = event.sides === 'E' ? '#00796b' : (event.sides === 'D' ? '#d84315' : '#212529');
-                            addSvgText(svg, event.sides, x - 8, centerY + 18, { 'font-size': 8, 'font-weight': '700', fill: sideColor });
+                            const durationUnits = local === 0 ? 4 : (local === 2 ? 2 : 1);
+                            if (durationUnits < 4) {
+                                shortNotes.push({ local, event, durationUnits });
+                            }
                         }
                     });
+                    const shouldBeam = shortNotes.length >= 2;
+                    const notePositions = [];
+
+                    beatEvents.forEach((event, local) => {
+                        let x = leftPad + (beatStart + local) * stepWidth + stepWidth / 2;
+                        if (local === 1 || local === 2 || local === 3) {
+                            x -= 12;
+                        }
+                        if (event) {
+                            const durationUnits = local === 0 ? 4 : (local === 2 ? 2 : 1);
+                            const durationInfo = getDurationInfoFromUnits(durationUnits);
+                            const isBeamedNote = shouldBeam && durationUnits < 4;
+
+                            drawRhythmNote(svg, x, centerY, durationInfo, '#212529', isBeamedNote);
+                            const sideColor = event.sides === 'E' ? '#00796b' : (event.sides === 'D' ? '#d84315' : '#212529');
+                            addSvgText(svg, event.sides, x - 3, centerY + 18, { 'font-size': 8, 'font-weight': '700', fill: sideColor });
+
+                            if (isBeamedNote) {
+                                notePositions.push({
+                                    x: x,
+                                    isSixteenth: durationUnits === 1
+                                });
+                            }
+                        }
+                    });
+
+                    if (shouldBeam) {
+                        drawBeams(svg, centerY, notePositions);
+                    }
                     continue;
                 }
 
                 const elements = buildBeatElements(beatEvents);
+                const shortNotes = elements.filter(el => el.kind === 'note' && el.duration.units < 4);
+                const shouldBeam = shortNotes.length >= 2;
+                const notePositions = [];
+
                 elements.forEach(element => {
-                    const x = leftPad + (beatStart + element.start) * stepWidth + (element.duration.units * stepWidth) / 2;
+                    let x = leftPad + (beatStart + element.start) * stepWidth + stepWidth / 2;
+                    if (element.start === 1 || element.start === 2 || element.start === 3) {
+                        x -= 12;
+                    }
+                    const isBeamedNote = shouldBeam && element.kind === 'note' && element.duration.units < 4;
+
                     if (element.kind === 'note') {
-                        drawRhythmNote(svg, x, centerY, element.duration, '#212529');
+                        drawRhythmNote(svg, x, centerY, element.duration, '#212529', isBeamedNote);
                         const sideColor = element.event.sides === 'E' ? '#00796b' : (element.event.sides === 'D' ? '#d84315' : '#212529');
-                        addSvgText(svg, element.event.sides, x - 8, centerY + 18, {
+                        addSvgText(svg, element.event.sides, x - 3, centerY + 18, {
                             'font-size': 8,
                             'font-weight': '700',
                             fill: sideColor
                         });
+
+                        if (isBeamedNote) {
+                            notePositions.push({
+                                x: x,
+                                isSixteenth: element.duration.name.includes('Semicolcheia')
+                            });
+                        }
                     } else {
                         drawRhythmRest(svg, x, centerY, element.duration, '#7f8c8d');
                     }
                 });
+
+                if (shouldBeam) {
+                    drawBeams(svg, centerY, notePositions);
+                }
             }
         }
     });
 
-    addSvgText(svg, `${state.meter} · partitura com linha central e pausas por tempo`, leftPad, height - 24, {
-        'font-size': 10,
-        fill: '#6c757d'
-    });
-    addSvgText(svg, 'Regras: tempo vazio = pausa de semínima; no 2º quarto = pausa de semicolcheia antes e pausa de colcheia depois; no 4º quarto = pausa de colcheia pontuada antes; compasso 4/4 vazio = pausa de semibreve.', leftPad, height - 10, {
-        'font-size': 9,
-        fill: '#6c757d'
-    });
+
 }
 
 function renderSequenceUI() {
@@ -3616,11 +3878,156 @@ function exportMidiSequence() {
     URL.revokeObjectURL(url);
 }
 
-function exportSequenceCertificateImage() {
+function showCustomPrompt(title, placeholderText) {
+    return new Promise((resolve) => {
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'custom-prompt-modal';
+        modalContainer.style.position = 'fixed';
+        modalContainer.style.top = '0';
+        modalContainer.style.left = '0';
+        modalContainer.style.width = '100vw';
+        modalContainer.style.height = '100vh';
+        modalContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
+        modalContainer.style.display = 'flex';
+        modalContainer.style.alignItems = 'center';
+        modalContainer.style.justifyContent = 'center';
+        modalContainer.style.zIndex = '99999';
+        modalContainer.style.opacity = '0';
+        modalContainer.style.transition = 'opacity 0.2s ease';
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.backgroundColor = '#ffffff';
+        modalContent.style.padding = '30px';
+        modalContent.style.borderRadius = '16px';
+        modalContent.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.15)';
+        modalContent.style.width = '420px';
+        modalContent.style.maxWidth = '90%';
+        modalContent.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        modalContent.style.transform = 'translateY(-20px)';
+        modalContent.style.transition = 'transform 0.2s ease';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title;
+        titleEl.style.margin = '0 0 16px 0';
+        titleEl.style.fontSize = '20px';
+        titleEl.style.fontWeight = '700';
+        titleEl.style.color = '#2c3e50';
+        titleEl.style.textAlign = 'center';
+        modalContent.appendChild(titleEl);
+
+        const inputEl = document.createElement('input');
+        inputEl.type = 'text';
+        inputEl.placeholder = placeholderText;
+        inputEl.style.width = '100%';
+        inputEl.style.padding = '12px 16px';
+        inputEl.style.fontSize = '16px';
+        inputEl.style.border = '2px solid #e2e8f0';
+        inputEl.style.borderRadius = '8px';
+        inputEl.style.outline = 'none';
+        inputEl.style.boxSizing = 'border-box';
+        inputEl.style.transition = 'border-color 0.2s ease';
+        inputEl.style.marginBottom = '20px';
+        inputEl.style.color = '#2c3e50';
+        inputEl.style.backgroundColor = '#ffffff';
+        
+        // Critical: Bypass * { user-select: none; }
+        inputEl.style.userSelect = 'text';
+        inputEl.style.webkitUserSelect = 'text';
+        inputEl.style.mozUserSelect = 'text';
+        inputEl.style.msUserSelect = 'text';
+        
+        inputEl.addEventListener('focus', () => {
+            inputEl.style.borderColor = '#9b59b6';
+        });
+        inputEl.addEventListener('blur', () => {
+            inputEl.style.borderColor = '#e2e8f0';
+        });
+        modalContent.appendChild(inputEl);
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex';
+        btnContainer.style.gap = '12px';
+        btnContainer.style.justifyContent = 'flex-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancelar';
+        cancelBtn.style.padding = '10px 18px';
+        cancelBtn.style.fontSize = '15px';
+        cancelBtn.style.fontWeight = '600';
+        cancelBtn.style.color = '#718096';
+        cancelBtn.style.backgroundColor = '#edf2f7';
+        cancelBtn.style.border = 'none';
+        cancelBtn.style.borderRadius = '8px';
+        cancelBtn.style.cursor = 'pointer';
+        cancelBtn.style.transition = 'background-color 0.15s ease';
+        cancelBtn.addEventListener('mouseover', () => cancelBtn.style.backgroundColor = '#e2e8f0');
+        cancelBtn.addEventListener('mouseout', () => cancelBtn.style.backgroundColor = '#edf2f7');
+        
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Confirmar';
+        confirmBtn.style.padding = '10px 18px';
+        confirmBtn.style.fontSize = '15px';
+        confirmBtn.style.fontWeight = '600';
+        confirmBtn.style.color = '#ffffff';
+        confirmBtn.style.backgroundColor = '#9b59b6';
+        confirmBtn.style.border = 'none';
+        confirmBtn.style.borderRadius = '8px';
+        confirmBtn.style.cursor = 'pointer';
+        confirmBtn.style.transition = 'background-color 0.15s ease';
+        confirmBtn.addEventListener('mouseover', () => confirmBtn.style.backgroundColor = '#8e44ad');
+        confirmBtn.addEventListener('mouseout', () => confirmBtn.style.backgroundColor = '#9b59b6');
+
+        btnContainer.appendChild(cancelBtn);
+        btnContainer.appendChild(confirmBtn);
+        modalContent.appendChild(btnContainer);
+        modalContainer.appendChild(modalContent);
+        document.body.appendChild(modalContainer);
+
+        setTimeout(() => {
+            modalContainer.style.opacity = '1';
+            modalContent.style.transform = 'translateY(0)';
+            inputEl.focus();
+        }, 10);
+
+        function closeModal(value) {
+            modalContainer.style.opacity = '0';
+            modalContent.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                document.body.removeChild(modalContainer);
+                resolve(value);
+            }, 200);
+        }
+
+        confirmBtn.addEventListener('click', () => {
+            closeModal(inputEl.value);
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            closeModal(null);
+        });
+
+        inputEl.addEventListener('keydown', (e) => {
+            e.stopPropagation(); // Stop keydown from reaching global app listeners
+            if (e.key === 'Enter') {
+                closeModal(inputEl.value);
+            } else if (e.key === 'Escape') {
+                closeModal(null);
+            }
+        });
+        
+        modalContainer.addEventListener('click', (e) => {
+            if (e.target === modalContainer) {
+                closeModal(null);
+            }
+        });
+    });
+}
+
+async function exportSequenceCertificateImage() {
     const seqData = sequenceToExportArray();
     if (seqData.length === 0) { alert('A sequência está vazia!'); return; }
 
-    const studentName = prompt('Digite seu nome para aparecer no certificado:');
+    const studentName = await showCustomPrompt('Gerar Certificado', 'Digite seu nome para aparecer no certificado:');
     if (studentName === null) return;
     const cleanStudentName = studentName.trim();
     if (!cleanStudentName) { alert('Digite um nome válido.'); return; }
@@ -3630,7 +4037,7 @@ function exportSequenceCertificateImage() {
     const timeText = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const cfg = getMeterConfig();
     const width = 1600;
-    const height = 1050;
+    const height = 1520;
     const margin = 90;
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -3661,115 +4068,221 @@ function exportSequenceCertificateImage() {
     ctx.fillText(`Data: ${dateText} • Hora: ${timeText} • Compasso: ${state.meter} • Andamento: ${state.bpm} BPM`, width / 2, 370);
 
     const gridX = margin;
-    const gridY = 450;
     const labelW = 110;
     const gridW = width - margin * 2 - labelW;
     const cellW = gridW / state.totalSteps;
-    const rowH = 72;
-    
-    let rows = [];
-    if (state.sequencerMode === 'lateral') {
-        rows = [
+
+    // --- 1. RENDER PARTITURA ---
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
+    ctx.fillStyle = '#5d6d7e';
+    ctx.fillText('1. Partitura', gridX, 425);
+
+    const svgEl = document.getElementById('body-score-svg');
+    if (svgEl) {
+        // Shift beams down by 3px temporarily for the certificate rendering
+        const beamLines = svgEl.querySelectorAll('.beam-line');
+        const originalYs = [];
+        beamLines.forEach(line => {
+            const y1 = parseFloat(line.getAttribute('y1'));
+            const y2 = parseFloat(line.getAttribute('y2'));
+            originalYs.push({ line, y1, y2 });
+            line.setAttribute('y1', y1 + 6);
+            line.setAttribute('y2', y2 + 6);
+        });
+
+        const svgString = new XMLSerializer().serializeToString(svgEl);
+
+        // Restore original beam positions after serialization
+        originalYs.forEach(({ line, y1, y2 }) => {
+            line.setAttribute('y1', y1);
+            line.setAttribute('y2', y2);
+        });
+
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(svgBlob);
+        
+        const svgImg = new Image();
+        const loadPromise = new Promise((resolve) => {
+            svgImg.onload = () => resolve(true);
+            svgImg.onerror = () => resolve(false);
+        });
+        svgImg.src = blobUrl;
+        await loadPromise;
+        URL.revokeObjectURL(blobUrl);
+
+        const svgWidth = svgEl.clientWidth || svgEl.getBoundingClientRect().width || 674;
+        const svgHeight = svgEl.clientHeight || svgEl.getBoundingClientRect().height || 286;
+        
+        const scale = 1.2;
+        const finalW = svgWidth * scale;
+        const finalH = svgHeight * scale;
+        const svgX = (width - finalW) / 2;
+        const svgY = 445;
+        
+        ctx.drawImage(svgImg, svgX, svgY, finalW, finalH);
+    }
+
+    function drawGrid(gridY, isLateral) {
+        const rows = isLateral ? [
             { key: 'L', label: 'ESQ', color: '#4db6ac' },
             { key: 'R', label: 'DIR', color: '#ff8a65' },
             { key: 'Move', label: 'DESL', color: '#ba68c8' },
             { key: 'Pos', label: 'GIRO', color: '#f9d65c' }
-        ];
-    } else {
-        rows = [
+        ] : [
             { key: 'Estalo', label: 'EST', color: '#2980b9' },
             { key: 'Peito', label: 'PEI', color: '#2980b9' },
             { key: 'Palma', label: 'PAL', color: '#2980b9' },
             { key: 'Coxa', label: 'COX', color: '#2980b9' },
             { key: 'Pé', label: 'PÉ', color: '#2980b9' }
         ];
-    }
 
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
-    ctx.fillStyle = '#5d6d7e';
-    ctx.fillText('Sequência registrada', gridX, gridY - 32);
+        const rowH = 46;
 
-    rows.forEach((row, r) => {
-        const y = gridY + r * rowH;
-        ctx.fillStyle = '#2c3e50';
-        ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(row.label, gridX + labelW - 18, y + 44);
+        // 1. Draw grid cell backgrounds and active notes first
+        rows.forEach((row, r) => {
+            const y = gridY + r * rowH;
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(row.label, gridX + labelW - 18, y + 28);
 
-        for (let i = 0; i < state.totalSteps; i++) {
-            const x = gridX + labelW + i * cellW;
-            ctx.fillStyle = '#f4f6f8';
-            ctx.strokeStyle = (i % cfg.measureSteps === 0) ? '#5d6d7e' : ((i % cfg.pulseSteps === 0) ? '#a0acb8' : '#d1d8df');
-            ctx.lineWidth = (i % cfg.measureSteps === 0) ? 3 : 1;
-            ctx.fillRect(x, y, cellW - 2, rowH - 12);
-            ctx.strokeRect(x, y, cellW - 2, rowH - 12);
+            for (let i = 0; i < state.totalSteps; i++) {
+                const x = gridX + labelW + i * cellW;
+                
+                // Light background for each cell
+                ctx.fillStyle = '#f4f6f8';
+                ctx.fillRect(x, y, cellW, rowH - 8);
 
-            let val = null;
-            let cellBgColor = row.color;
-            let textVal = '';
-            let textColor = '#fff';
+                let val = null;
+                let cellBgColor = row.color;
+                let textVal = '';
+                let textColor = '#fff';
 
-            if (state.sequencerMode === 'lateral') {
-                val = state.sequence[i][row.key];
-                if (row.key === 'L' || row.key === 'R') {
-                    if (val === null || val === 'Palma') {
+                if (isLateral) {
+                    val = state.sequence[i][row.key];
+                    if (row.key === 'L' || row.key === 'R') {
+                        if (val === null || val === 'Palma') {
+                            const hasClap = (state.sequence[i].L === 'Palma' || state.sequence[i].R === 'Palma');
+                            if (hasClap) {
+                                val = 'Palma';
+                            }
+                        }
+                    }
+                    if (val) {
+                        textVal = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es', 'Frente': 'Fre', 'Trás': 'Trá' }[val] || val;
+                        cellBgColor = row.color;
+                        textColor = row.key === 'Pos' ? '#333' : '#fff';
+                    }
+                } else {
+                    const inst = row.key;
+                    if (inst === 'Palma') {
                         const hasClap = (state.sequence[i].L === 'Palma' || state.sequence[i].R === 'Palma');
                         if (hasClap) {
                             val = 'Palma';
+                            textVal = 'Pl';
+                            cellBgColor = '#9b59b6';
+                        }
+                    } else {
+                        const isL = (state.sequence[i].L === inst);
+                        const isR = (state.sequence[i].R === inst);
+                        if (isL && isR) {
+                            val = inst;
+                            textVal = 'E+D';
+                            cellBgColor = '#9b59b6';
+                        } else if (isL) {
+                            val = inst;
+                            textVal = 'E';
+                            cellBgColor = '#4db6ac';
+                        } else if (isR) {
+                            val = inst;
+                            textVal = 'D';
+                            cellBgColor = '#ff8a65';
                         }
                     }
                 }
-                if (val) {
-                    textVal = { 'Pé': 'Pé', 'Coxa': 'Cx', 'Peito': 'Pt', 'Palma': 'Pl', 'Estalo': 'Es', 'Frente': 'Fre', 'Trás': 'Trá' }[val] || val;
-                    cellBgColor = row.color;
-                    textColor = row.key === 'Pos' ? '#333' : '#fff';
-                }
-            } else {
-                const inst = row.key;
-                if (inst === 'Palma') {
-                    const hasClap = (state.sequence[i].L === 'Palma' || state.sequence[i].R === 'Palma');
-                    if (hasClap) {
-                        val = 'Palma';
-                        textVal = 'Pl';
-                        cellBgColor = '#9b59b6'; // Purple for Palma
-                    }
-                } else {
-                    const isL = (state.sequence[i].L === inst);
-                    const isR = (state.sequence[i].R === inst);
-                    if (isL && isR) {
-                        val = inst;
-                        textVal = 'E+D';
-                        cellBgColor = '#9b59b6'; // Purple
-                    } else if (isL) {
-                        val = inst;
-                        textVal = 'E';
-                        cellBgColor = '#4db6ac'; // Teal
-                    } else if (isR) {
-                        val = inst;
-                        textVal = 'D';
-                        cellBgColor = '#ff8a65'; // Coral
-                    }
-                }
-            }
 
-            if (val) {
-                ctx.fillStyle = cellBgColor;
-                ctx.fillRect(x + 3, y + 3, Math.max(3, cellW - 8), rowH - 18);
-                ctx.fillStyle = textColor;
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
-                ctx.fillText(textVal, x + cellW / 2, y + 40);
+                if (val) {
+                    ctx.fillStyle = cellBgColor;
+                    // Leave a tiny margin inside cell for the note block
+                    ctx.fillRect(x + 2, y + 2, Math.max(2, cellW - 4), rowH - 12);
+                    ctx.fillStyle = textColor;
+                    ctx.textAlign = 'center';
+                    ctx.font = 'bold 15px Segoe UI, Arial, sans-serif';
+                    ctx.fillText(textVal, x + cellW / 2, y + 26);
+                }
             }
+        });
+
+        // 2. Draw horizontal row separator lines
+        rows.forEach((row, r) => {
+            const y = gridY + r * rowH;
+            ctx.beginPath();
+            ctx.moveTo(gridX + labelW, y + rowH - 8);
+            ctx.lineTo(gridX + labelW + gridW, y + rowH - 8);
+            if (r === rows.length - 1) {
+                ctx.strokeStyle = '#5d6d7e'; // Bottom border
+                ctx.lineWidth = 2.5;
+            } else {
+                ctx.strokeStyle = '#a0acb8'; // Internal row divider
+                ctx.lineWidth = 1.2;
+            }
+            ctx.stroke();
+        });
+        // Draw the top line of the grid
+        ctx.beginPath();
+        ctx.moveTo(gridX + labelW, gridY);
+        ctx.lineTo(gridX + labelW + gridW, gridY);
+        ctx.strokeStyle = '#5d6d7e'; // Top border
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 3. Draw vertical lines (measure bars and beat lines) on top, spanning all rows
+        const totalGridHeight = rows.length * rowH - 8;
+        for (let i = 0; i <= state.totalSteps; i++) {
+            const x = gridX + labelW + i * cellW;
+            
+            if (i === 0 || i === state.totalSteps || i % cfg.measureSteps === 0) {
+                // Measure bar - thick line
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2.5;
+            } else if (i % cfg.pulseSteps === 0) {
+                // Beat line - thin line
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 1.5;
+            } else {
+                // Step subdivision - light grey line, visible
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 1.0;
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(x, gridY);
+            ctx.lineTo(x, gridY + totalGridHeight);
+            ctx.stroke();
         }
-    });
+    }
+
+    const sonsY = 825;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
+    ctx.fillStyle = '#5d6d7e';
+    ctx.fillText('2. Visualização por Sons (Instrumental)', gridX, sonsY);
+    drawGrid(sonsY + 20, false);
+
+    const ladosY = 1145;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
+    ctx.fillStyle = '#5d6d7e';
+    ctx.fillText('3. Visualização por Lados (Lateral)', gridX, ladosY);
+    drawGrid(ladosY + 20, true);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#795548';
     ctx.font = '22px Segoe UI, Arial, sans-serif';
-    ctx.fillText('Gerado no aplicativo Percorporalizando para envio ao(à) professor(a).', width / 2, height - 125);
+    ctx.fillText('Gerado no aplicativo Percorporalizando para envio ao(à) professor(a).', width / 2, height - 110);
     ctx.font = '18px Segoe UI, Arial, sans-serif';
-    ctx.fillText('Legenda: Pé, Cx=Coxa, Pt=Peito, Pl=Palma, Es=Estalo.', width / 2, height - 88);
+    ctx.fillText('Legenda: Pé, Cx=Coxa, Pt=Peito, Pl=Palma, Es=Estalo.', width / 2, height - 70);
 
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
