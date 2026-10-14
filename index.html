@@ -1148,8 +1148,28 @@ const AVATAR_STYLES = [
         subtitle: 'Uniforme Militar Tático Mixamo',
         badge: '🎖️ Tático',
         badgeColor: '#2563eb',
-        description: 'Modelo 3D com uniforme tático de combate (jaqueta militar camuflada, calça cargo com bolsos táticos, cinto de equipamentos e botas de combate) animado com esqueleto Mixamo.',
+        description: 'Modelo 3D com uniforme militar tático de combate (jaqueta camuflada, calça cargo com bolsos táticos, cinto de equipamentos e botas de combate) animado com esqueleto Mixamo.',
         features: ['Uniforme tático de combate', 'Jaqueta e calça camuflada', 'Botas de combate militares', 'Esqueleto Mixamo animado']
+    },
+    {
+        id: 'esqueleto_xbot',
+        icon: '🦾',
+        name: 'Esqueleto 3D / Manequim (X-Bot)',
+        subtitle: 'Malha Poligonal com Juntas Mecânicas',
+        badge: '🔥 Clássico Mixamo',
+        badgeColor: '#dc2626',
+        description: 'O clássico manequim esqueleto poligonal com juntas mecânicas vermelhas e estrutura anatômica Mixamo. Visual sci-fi biomecânico articulado puro!',
+        features: ['Juntas mecânicas vermelhas', 'Malha anatômica poligonal', 'Esqueleto Mixamo completo', 'Visual biomecânico sci-fi']
+    },
+    {
+        id: 'esqueleto_fitness',
+        icon: '⚡',
+        name: 'Esqueleto com Roupa de Exercícios',
+        subtitle: 'X-Bot com Visual de Treino e Academia',
+        badge: '🏃 Fitness + Esqueleto',
+        badgeColor: '#059669',
+        description: 'O manequim esqueleto 3D vestindo roupas de exercícios: camiseta dry-fit esportiva, bermuda de corrida com listras atléticas, tênis running, smartwatch e faixa de suor, mantendo suas juntas mecânicas vermelhas visíveis!',
+        features: ['Esqueleto com juntas vermelhas', 'Camiseta dry-fit sobre o tórax', 'Bermuda atlética de treino', 'Tênis running & smartwatch']
     },
     {
         id: 'atleta_exercicios',
@@ -1163,6 +1183,11 @@ const AVATAR_STYLES = [
     }
 ];
 
+const glbTemplates = {
+    'soldier.glb': null,
+    'xbot.glb': null,
+    'custom': null
+};
 let glbTemplate = null;
 let glbLoading = false;
 
@@ -3255,8 +3280,9 @@ function initThreeJS() {
     scene.add(gridHelper);
 
     initAvatars();
-    if (state.avatarStyle === 'realista_glb' && state.avatarModel === 'realista') {
-        loadGLBModel('soldier.glb');
+    if (state.avatarModel === 'realista') {
+        const glbFile = (state.avatarStyle === 'realista_glb') ? 'soldier.glb' : 'xbot.glb';
+        loadGLBModel(glbFile);
     }
 
     window.addEventListener('resize', () => {
@@ -4951,7 +4977,8 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
  * createGLBAvatar — Cria uma instância do modelo 3D realista (GLB/GLTF)
  * mapeando os ossos do esqueleto Mixamo/Standard para o sistema de controle percussivo.
  */
-function createGLBAvatar(isMain, x, z, scaleParam, template) {
+function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
+    const activeStyle = styleId || state.avatarStyle || 'esqueleto_xbot';
     const group = new THREE.Group();
     // No modelo GLB realista a base do pé fica em y = 0
     group.position.set(x, 0, z);
@@ -4977,20 +5004,40 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            if (child.name === 'Beta_Surface') {
-                // Remove qualquer aspecto de esqueleto vermelho caso o modelo xbot seja carregado:
-                // reveste a superfície com um macacão esportivo moderno azul marinho escuro
-                child.material = new THREE.MeshStandardMaterial({
-                    color: isMain ? 0x243342 : 0x1a252f,
-                    roughness: 0.55,
-                    metalness: 0.1
-                });
-            } else if (child.name === 'Beta_Joints') {
-                child.material = new THREE.MeshStandardMaterial({
-                    color: 0x1f2428,
-                    roughness: 0.65,
-                    metalness: 0.2
-                });
+            if (activeStyle === 'esqueleto_xbot') {
+                if (child.name === 'Beta_Joints') {
+                    // Juntas mecânicas vermelhas clássicas que o usuário adorou
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: 0xef4444,
+                        emissive: new THREE.Color(0xd32f2f),
+                        emissiveIntensity: 0.65,
+                        roughness: 0.35,
+                        metalness: 0.75
+                    });
+                } else if (child.name === 'Beta_Surface') {
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: 0x27272a,
+                        roughness: 0.45,
+                        metalness: 0.8
+                    });
+                }
+            } else if (activeStyle === 'esqueleto_fitness') {
+                if (child.name === 'Beta_Joints') {
+                    // Juntas mecânicas vermelhas preservadas
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: 0xef4444,
+                        emissive: new THREE.Color(0xd32f2f),
+                        emissiveIntensity: 0.65,
+                        roughness: 0.35,
+                        metalness: 0.75
+                    });
+                } else if (child.name === 'Beta_Surface') {
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: 0x1e293b,
+                        roughness: 0.5,
+                        metalness: 0.6
+                    });
+                }
             } else if (child.material) {
                 child.material = child.material.clone();
             }
@@ -5018,6 +5065,9 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
         return bone;
     };
 
+    const headBone = initBone(findBone(/head$/i));
+    const spine2Bone = initBone(findBone(/spine2$/i)) || initBone(findBone(/spine1$/i));
+    const hipsBone = initBone(findBone(/hips$/i));
     const armPivotL = initBone(findBone(/leftarm$/i));
     const armPivotR = initBone(findBone(/rightarm$/i));
     const forearmPivotL = initBone(findBone(/leftforearm$/i));
@@ -5031,23 +5081,13 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
     const footL = initBone(findBone(/leftfoot$/i));
     const footR = initBone(findBone(/rightfoot$/i));
 
-    // Suporte ao AnimationMixer para modelos GLB com animações embutidas (ex: Idle e Walk do Soldier)
-    let mixer = null;
-    let actions = {};
-    if (template.animations && template.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(clonedModel);
-        const idleClip = THREE.AnimationClip.findByName(template.animations, 'Idle') || template.animations[0];
-        if (idleClip) {
-            const idleAction = mixer.clipAction(idleClip);
-            idleAction.play();
-            actions.idle = idleAction;
-        }
-        const walkClip = THREE.AnimationClip.findByName(template.animations, 'Walk');
-        if (walkClip) {
-            const walkAction = mixer.clipAction(walkClip);
-            actions.walk = walkAction;
-        }
-    }
+    const setupGlowAndShadow = (mesh) => {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.baseColor = mesh.material.color.clone();
+        mesh.userData.targetScale = 1.0;
+        mesh.userData.isAnimating = false;
+    };
 
     const dummyMesh = {
         userData: { targetScale: 1.0, isAnimating: false },
@@ -5071,6 +5111,134 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
             meshes: { 'Coxa': dummyMesh, 'Pé': dummyMesh, 'Palma': dummyMesh, 'Estalo': dummyMesh, 'Peito': dummyMesh }
         }
     };
+
+    // SE FOR O ESTILO ESQUELETO FITNESS: anexa roupas e acessórios esportivos diretamente aos ossos
+    if (activeStyle === 'esqueleto_fitness') {
+        const matTop = new THREE.MeshStandardMaterial({ color: isMain ? 0x0284c7 : 0x0ea5e9, roughness: 0.65 });
+        const matShorts = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.75 });
+        const matStripe = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const matRed = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.75 });
+
+        // 1. Faixa de suor atlética (headband) na cabeça do esqueleto
+        if (headBone) {
+            const hb = new THREE.Mesh(new THREE.TorusGeometry(10.5, 1.3, 12, 28), matRed);
+            hb.position.set(0, 10.0, 1.2);
+            hb.rotation.x = Math.PI / 2;
+            hb.scale.set(1.0, 1.1, 1.0);
+            headBone.add(hb);
+        }
+
+        // 2. Camiseta/regata esportiva dry-fit no tórax + Almofadas de Peito
+        if (spine2Bone) {
+            const topGeo = new THREE.CylinderGeometry(17, 15, 23, 18);
+            const topMesh = new THREE.Mesh(topGeo, matTop);
+            topMesh.position.set(0, 8.0, 0);
+            topMesh.scale.set(1.15, 1.0, 0.85);
+            spine2Bone.add(topMesh);
+
+            const padL = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 12), matTop.clone());
+            padL.position.set(-8, 9, 8);
+            padL.scale.set(1.0, 0.8, 0.5);
+            setupGlowAndShadow(padL);
+            spine2Bone.add(padL);
+            parts.L.meshes['Peito'] = padL;
+
+            const padR = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 12), matTop.clone());
+            padR.position.set(8, 9, 8);
+            padR.scale.set(1.0, 0.8, 0.5);
+            setupGlowAndShadow(padR);
+            spine2Bone.add(padR);
+            parts.R.meshes['Peito'] = padR;
+        }
+
+        // 3. Bermuda atlética de corrida no quadril
+        if (hipsBone) {
+            const shortsGeo = new THREE.CylinderGeometry(18, 17, 19, 18);
+            const shortsMesh = new THREE.Mesh(shortsGeo, matShorts);
+            shortsMesh.position.set(0, -6.0, 0);
+            shortsMesh.scale.set(1.1, 1.0, 0.9);
+            hipsBone.add(shortsMesh);
+
+            [-1, 1].forEach(s => {
+                const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 17, 1.2), matStripe);
+                stripe.position.set(s * 19, -6.0, 0);
+                hipsBone.add(stripe);
+            });
+        }
+
+        // 4. Smartwatch fitness no antebraço esquerdo
+        if (forearmPivotL) {
+            const watchMesh = new THREE.Mesh(new THREE.BoxGeometry(4.2, 4.8, 1.5), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 }));
+            watchMesh.position.set(0, 15, 3.5);
+            const screenMesh = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.8, 0.2), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+            screenMesh.position.set(0, 15, 4.3);
+            forearmPivotL.add(watchMesh);
+            forearmPivotL.add(screenMesh);
+        }
+
+        // 5. Munhequeira esportiva no antebraço direito
+        if (forearmPivotR) {
+            const wbMesh = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 6.0, 14), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 }));
+            wbMesh.position.set(0, 14, 0);
+            forearmPivotR.add(wbMesh);
+        }
+
+        // 6. Tênis de corrida running nos pés
+        [ { bone: footL, side: 'L' }, { bone: footR, side: 'R' } ].forEach(({ bone, side }) => {
+            if (bone) {
+                const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(9.5, 7.5, 22), new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6 }));
+                shoeBody.position.set(0, -2, 4);
+                setupGlowAndShadow(shoeBody);
+                bone.add(shoeBody);
+                parts[side].meshes['Pé'] = shoeBody;
+
+                const sole = new THREE.Mesh(new THREE.BoxGeometry(10.2, 2.5, 23.5), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.7 }));
+                sole.position.set(0, -5, 4);
+                bone.add(sole);
+            }
+        });
+
+        // 7. Almofadas de impacto sonoro nas coxas e palmas
+        [ { bone: legPivotL, side: 'L' }, { bone: legPivotR, side: 'R' } ].forEach(({ bone, side }) => {
+            if (bone) {
+                const coxaPad = new THREE.Mesh(new THREE.SphereGeometry(7, 12, 12), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.5 }));
+                coxaPad.position.set(0, 20, 4);
+                coxaPad.scale.set(1.0, 1.4, 0.7);
+                setupGlowAndShadow(coxaPad);
+                bone.add(coxaPad);
+                parts[side].meshes['Coxa'] = coxaPad;
+            }
+        });
+
+        [ { bone: handL, side: 'L' }, { bone: handR, side: 'R' } ].forEach(({ bone, side }) => {
+            if (bone) {
+                const handPad = new THREE.Mesh(new THREE.BoxGeometry(7, 9, 2.5), new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 }));
+                handPad.position.set(0, 6, 0);
+                setupGlowAndShadow(handPad);
+                bone.add(handPad);
+                parts[side].meshes['Palma'] = handPad;
+                parts[side].meshes['Estalo'] = handPad;
+            }
+        });
+    }
+
+    // Suporte ao AnimationMixer para modelos GLB com animações embutidas (ex: Idle e Walk do Soldier)
+    let mixer = null;
+    let actions = {};
+    if (template.animations && template.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(clonedModel);
+        const idleClip = THREE.AnimationClip.findByName(template.animations, 'Idle') || template.animations[0];
+        if (idleClip) {
+            const idleAction = mixer.clipAction(idleClip);
+            idleAction.play();
+            actions.idle = idleAction;
+        }
+        const walkClip = THREE.AnimationClip.findByName(template.animations, 'Walk');
+        if (walkClip) {
+            const walkAction = mixer.clipAction(walkClip);
+            actions.walk = walkAction;
+        }
+    }
 
     return { group, parts, isMain, isGLB: true, mixer, actions, id: Math.random().toString(36).substring(7) };
 }
@@ -5103,12 +5271,24 @@ function selectAvatarStyle(styleId) {
     state.avatarStyle = styleId;
     if (styleId === 'realista_glb') {
         state.avatarModel = 'realista';
-        if (glbTemplate) {
+        if (glbTemplates['soldier.glb']) {
             initAvatars();
             updateAvatarModelUI();
             renderAvatarShowcaseCards();
         } else {
             loadGLBModel('soldier.glb', () => {
+                renderAvatarShowcaseCards();
+                updateAvatarModelUI();
+            });
+        }
+    } else if (styleId === 'esqueleto_xbot' || styleId === 'esqueleto_fitness') {
+        state.avatarModel = 'realista';
+        if (glbTemplates['xbot.glb']) {
+            initAvatars();
+            updateAvatarModelUI();
+            renderAvatarShowcaseCards();
+        } else {
+            loadGLBModel('xbot.glb', () => {
                 renderAvatarShowcaseCards();
                 updateAvatarModelUI();
             });
@@ -5160,23 +5340,34 @@ function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
         console.warn('GLTFLoader não disponível');
         return;
     }
-    const targetFile = sourceUrlOrBuffer || 'soldier.glb';
+    const targetFile = (typeof sourceUrlOrBuffer === 'string') ? sourceUrlOrBuffer : 'xbot.glb';
+    if (typeof sourceUrlOrBuffer === 'string' && glbTemplates[targetFile]) {
+        glbTemplate = glbTemplates[targetFile];
+        initAvatars();
+        updateAvatarModelUI();
+        if (onComplete) onComplete(glbTemplates[targetFile]);
+        return;
+    }
+
     glbLoading = true;
     updateAvatarModelUI();
     const loader = new THREE.GLTFLoader();
 
     const onSuccess = (gltf) => {
-        glbTemplate = gltf;
         glbLoading = false;
-        state.avatarStyle = 'realista_glb';
-        state.avatarModel = 'realista';
+        glbTemplate = gltf;
+        if (typeof targetFile === 'string') {
+            glbTemplates[targetFile] = gltf;
+        } else {
+            glbTemplates['custom'] = gltf;
+        }
         updateAvatarModelUI();
         initAvatars();
         if (onComplete) onComplete(gltf);
     };
 
     const onFail = (err) => {
-        console.warn('Falha ao carregar modelo GLB primário:', err);
+        console.warn('Falha ao carregar modelo GLB local:', targetFile, err);
         // Fallback para URL pública do Three.js com CORS liberado
         if (typeof targetFile === 'string' && (targetFile === 'soldier.glb' || targetFile === 'xbot.glb')) {
             const fallbackUrl = (targetFile === 'soldier.glb')
@@ -5220,10 +5411,18 @@ function clearAvatars() {
 function initAvatars() {
     clearAvatars();
 
-    const isUsingGLB = (state.avatarStyle === 'realista_glb' && state.avatarModel === 'realista' && glbTemplate);
+    const isGLBStyle = (
+        state.avatarStyle === 'realista_glb' ||
+        state.avatarStyle === 'esqueleto_xbot' ||
+        state.avatarStyle === 'esqueleto_fitness'
+    );
+    const glbTargetFile = (state.avatarStyle === 'realista_glb') ? 'soldier.glb' : 'xbot.glb';
+    const activeTemplate = glbTemplates[glbTargetFile] || glbTemplates['custom'] || glbTemplate;
+    const isUsingGLB = (isGLBStyle && state.avatarModel === 'realista' && activeTemplate);
+
     const createFn = (isMain, x, z, scale, skin, shirt, pants) => {
         if (isUsingGLB) {
-            return createGLBAvatar(isMain, x, z, scale, glbTemplate);
+            return createGLBAvatar(isMain, x, z, scale, activeTemplate, state.avatarStyle);
         } else {
             return createSingleAvatar(state.avatarStyle || 'boneco_madeira', isMain, x, z, scale, skin, shirt, pants);
         }
