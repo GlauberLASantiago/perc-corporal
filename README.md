@@ -25,11 +25,14 @@ Uma janela flutuante que desenha em tempo real a partitura rítmica corresponden
 *   Os símbolos adaptam-se automaticamente à fórmula de compasso selecionada (2/4, 3/4, 4/4 ou 6/8).
 *   Inclui um marcador visual (playhead) sincronizado com a execução do áudio para acompanhamento de leitura.
 
-### 3. Palco 3D Interativo
-*   **Dois Estilos de Avatar**:
-    *   **Avatar Realista (GLB)**: Suporte a modelos 3D humanos com malha contínua e esqueleto (*rigging* padrão Mixamo/Three.js), com rotações anatômicas dos ossos integradas às batidas corporais e caminhada.
-    *   **Avatar Estilizado (Nativo)**: Modelo procedural de alta performance com proporções anatômicas refinadas, olhos vivos com *catchlight*, mãos expressivas e tênis esportivos (*sneakers*).
-    *   **Carregador de Modelos (.GLB)**: Permite importar qualquer arquivo de personagem 3D `.glb` ou `.gltf` (do Mixamo, Ready Player Me, etc.) diretamente pelo navegador.
+### 3. Palco 3D Interativo e Mostruário de Avatares
+*   **🎭 Mostruário de Avatares 3D**:
+    *   **🎨 Boneco de Madeira (Manequim Artístico - Recomendado)**: O clássico manequim articulado de ateliê em madeira nobre torneada (faia e nogueira). Totalmente livre de estranheza (*uncanny valley*), acolhedor, elegante e ideal para ambientes de educação musical.
+    *   **🤖 Mascote Robô (Astro Bot)**: Robozinho simpático e carismático com chassi branco perolado, visor escuro com olhinhos felizes luminosos `( ^ _ ^ )` e núcleo percussivo no peito.
+    *   **🎓 Estudante Casual**: Personagem jovem estilizado com camiseta colorida, calça jeans casual e tênis esportivos modernos (*sneakers*).
+    *   **✨ Minimalista Nórdico**: Estética limpa de ateliê com geometria pura, tons foscos harmoniosos (ardósia, terracota e sálvia) e detalhes em bronze escovado.
+    *   **🦾 Manequim GLB (Técnico)**: Modelo 3D com malha contínua e esqueleto de ossos (*rigging* Mixamo).
+    *   **📁 Carregador de Modelos Customizados**: Permite carregar qualquer arquivo `.glb` ou `.gltf` do computador diretamente pela interface do mostruário.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
 *   **Efeito Coletivo**: No modo turma, é aplicado um leve atraso espacial (delay e reverb) para emular o som acústico de um grupo de pessoas tocando em uma sala de aula.
 
