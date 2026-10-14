@@ -8,6 +8,8 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
@@ -935,6 +937,10 @@
         <button id="export-midi-btn">🎼 Exportar MIDI</button>
         <button id="export-image-btn">🎓 Gerar Certificado</button>
 
+        <button id="avatar-model-btn" style="background: #e67e22; color:white;" title="Alternar entre Avatar Realista (GLB) e Avatar Estilizado">👤 Avatar: Realista (GLB)</button>
+        <button id="load-glb-btn" style="background: #16a085; color:white;" title="Carregar qualquer modelo .glb ou .gltf do seu computador">📁 Carregar .GLB</button>
+        <input type="file" id="glb-file-input" accept=".glb,.gltf" style="display:none;">
+
         <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
         <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Melodia: OFF</button>
         <select id="melody-scale-select" title="Escolher escala da melodia" style="background: #795548; color: white; border: 1px solid #5d4037; border-radius: 8px; padding: 4px 8px; font-size: 0.85em; display: none; height: 32px; vertical-align: middle; margin-left: 4px; font-family: inherit; font-weight: bold; cursor: pointer;">
@@ -976,8 +982,12 @@ const state = {
     totalSteps: 32, currentStep: 0,
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
     selectedTool: null, draggedData: null,
-    sequencerMode: 'lateral'
+    sequencerMode: 'lateral',
+    avatarModel: 'realista' // 'realista' (GLB) ou 'estilizado' (procedural)
 };
+
+let glbTemplate = null;
+let glbLoading = false;
 
 let targetBodyRotY = 0;
 const moveStepSize = 14;
@@ -2008,6 +2018,40 @@ function initUI() {
         setTimeSignature(e.target.value, true);
     });
 
+    const avatarModelBtn = document.getElementById('avatar-model-btn');
+    if (avatarModelBtn) {
+        avatarModelBtn.addEventListener('click', () => {
+            if (state.avatarModel === 'estilizado') {
+                if (glbTemplate) {
+                    state.avatarModel = 'realista';
+                    updateAvatarModelUI();
+                    initAvatars();
+                } else {
+                    loadGLBModel('xbot.glb');
+                }
+            } else {
+                state.avatarModel = 'estilizado';
+                updateAvatarModelUI();
+                initAvatars();
+            }
+        });
+    }
+
+    const loadGlbBtn = document.getElementById('load-glb-btn');
+    const glbFileInput = document.getElementById('glb-file-input');
+    if (loadGlbBtn && glbFileInput) {
+        loadGlbBtn.addEventListener('click', () => glbFileInput.click());
+        glbFileInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                loadGLBModel(evt.target.result);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
     const turmaBtn = document.getElementById('turma-btn');
     turmaBtn.addEventListener('click', () => {
         const nextLayout = state.turmaLayout === 'off' ? 'fileiras' : (state.turmaLayout === 'fileiras' ? 'roda' : 'off');
@@ -3026,6 +3070,9 @@ function initThreeJS() {
     scene.add(gridHelper);
 
     initAvatars();
+    if (state.avatarModel === 'realista') {
+        loadGLBModel('xbot.glb');
+    }
 
     window.addEventListener('resize', () => {
         camera.aspect = container.clientWidth / container.clientHeight;
@@ -3510,10 +3557,227 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
     return { group, parts, isMain, id: Math.random().toString(36).substring(7) };
 }
 
+/**
+ * createGLBAvatar — Cria uma instância do modelo 3D realista (GLB/GLTF)
+ * mapeando os ossos do esqueleto Mixamo/Standard para o sistema de controle percussivo.
+ */
+function createGLBAvatar(isMain, x, z, scaleParam, template) {
+    const group = new THREE.Group();
+    // No modelo GLB realista a base do pé fica em y = 0
+    group.position.set(x, 0, z);
+    group.userData.baseX = x;
+    group.userData.baseZ = z;
+    group.userData.baseRotY = 0;
+    group.userData.fileBaseX = x;
+    group.userData.fileBaseZ = z;
+    group.userData.fileBaseRotY = 0;
+    group.userData.circleBaseX = x;
+    group.userData.circleBaseZ = z;
+    group.userData.circleBaseRotY = 0;
+
+    const clonedModel = (typeof THREE.SkeletonUtils !== 'undefined' && THREE.SkeletonUtils.clone)
+        ? THREE.SkeletonUtils.clone(template.scene)
+        : template.scene.clone();
+
+    // Escala para corresponder à altura dos avatares do palco (~42 unidades)
+    const modelScale = 23.5 * scaleParam;
+    clonedModel.scale.set(modelScale, modelScale, modelScale);
+
+    clonedModel.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+                child.material = child.material.clone();
+            }
+        }
+    });
+
+    group.add(clonedModel);
+
+    const findBone = (regex) => {
+        let found = null;
+        clonedModel.traverse(child => {
+            if (!found && (child.isBone || child.type === 'Bone')) {
+                const clean = child.name.replace(/[:_\-\s]/g, '');
+                if (regex.test(clean)) found = child;
+            }
+        });
+        return found;
+    };
+
+    const armPivotL = findBone(/leftarm$/i);
+    const armPivotR = findBone(/rightarm$/i);
+    const forearmPivotL = findBone(/leftforearm$/i);
+    const forearmPivotR = findBone(/rightforearm$/i);
+    const legPivotL = findBone(/leftupleg$/i);
+    const legPivotR = findBone(/rightupleg$/i);
+    const shinPivotL = findBone(/leftleg$/i);
+    const shinPivotR = findBone(/rightleg$/i);
+    const handL = findBone(/lefthand$/i);
+    const handR = findBone(/righthand$/i);
+    const footL = findBone(/leftfoot$/i);
+    const footR = findBone(/rightfoot$/i);
+
+    // Posição de repouso (A-pose natural)
+    if (armPivotL) {
+        armPivotL.userData.restingRot = new THREE.Euler(0, 0, -1.25);
+        armPivotL.rotation.copy(armPivotL.userData.restingRot);
+        armPivotL.userData.isAnimating = false;
+        armPivotL.userData.animProgress = 0;
+    }
+    if (armPivotR) {
+        armPivotR.userData.restingRot = new THREE.Euler(0, 0, 1.25);
+        armPivotR.rotation.copy(armPivotR.userData.restingRot);
+        armPivotR.userData.isAnimating = false;
+        armPivotR.userData.animProgress = 0;
+    }
+    if (forearmPivotL) {
+        forearmPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
+        forearmPivotL.rotation.copy(forearmPivotL.userData.restingRot);
+        forearmPivotL.userData.isAnimating = false;
+        forearmPivotL.userData.animProgress = 0;
+    }
+    if (forearmPivotR) {
+        forearmPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
+        forearmPivotR.rotation.copy(forearmPivotR.userData.restingRot);
+        forearmPivotR.userData.isAnimating = false;
+        forearmPivotR.userData.animProgress = 0;
+    }
+    if (legPivotL) {
+        legPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
+        legPivotL.rotation.copy(legPivotL.userData.restingRot);
+        legPivotL.userData.isAnimating = false;
+        legPivotL.userData.animProgress = 0;
+    }
+    if (legPivotR) {
+        legPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
+        legPivotR.rotation.copy(legPivotR.userData.restingRot);
+        legPivotR.userData.isAnimating = false;
+        legPivotR.userData.animProgress = 0;
+    }
+    if (shinPivotL) {
+        shinPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
+        shinPivotL.rotation.copy(shinPivotL.userData.restingRot);
+        shinPivotL.userData.isAnimating = false;
+        shinPivotL.userData.animProgress = 0;
+    }
+    if (shinPivotR) {
+        shinPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
+        shinPivotR.rotation.copy(shinPivotR.userData.restingRot);
+        shinPivotR.userData.isAnimating = false;
+        shinPivotR.userData.animProgress = 0;
+    }
+
+    const dummyMesh = {
+        userData: { targetScale: 1.0, isAnimating: false },
+        scale: new THREE.Vector3(1, 1, 1),
+        material: { emissive: new THREE.Color(0), emissiveIntensity: 0 }
+    };
+
+    const parts = {
+        L: {
+            armPivot: armPivotL,
+            forearmPivot: forearmPivotL,
+            legPivot: legPivotL,
+            shinPivot: shinPivotL,
+            meshes: { 'Coxa': dummyMesh, 'Pé': dummyMesh, 'Palma': dummyMesh, 'Estalo': dummyMesh, 'Peito': dummyMesh }
+        },
+        R: {
+            armPivot: armPivotR,
+            forearmPivot: forearmPivotR,
+            legPivot: legPivotR,
+            shinPivot: shinPivotR,
+            meshes: { 'Coxa': dummyMesh, 'Pé': dummyMesh, 'Palma': dummyMesh, 'Estalo': dummyMesh, 'Peito': dummyMesh }
+        }
+    };
+
+    return { group, parts, isMain, isGLB: true, id: Math.random().toString(36).substring(7) };
+}
+
+function updateAvatarModelUI() {
+    const btn = document.getElementById('avatar-model-btn');
+    if (!btn) return;
+    if (glbLoading) {
+        btn.textContent = '⏳ Carregando 3D...';
+        btn.style.background = '#f39c12';
+    } else if (state.avatarModel === 'realista') {
+        btn.textContent = '🤖 Avatar: Realista (GLB)';
+        btn.style.background = '#27ae60';
+    } else {
+        btn.textContent = '👤 Avatar: Estilizado (Nativo)';
+        btn.style.background = '#e67e22';
+    }
+}
+
+function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
+    if (typeof THREE.GLTFLoader === 'undefined') {
+        console.warn('GLTFLoader não disponível');
+        return;
+    }
+    glbLoading = true;
+    updateAvatarModelUI();
+    const loader = new THREE.GLTFLoader();
+
+    const onSuccess = (gltf) => {
+        glbTemplate = gltf;
+        glbLoading = false;
+        state.avatarModel = 'realista';
+        updateAvatarModelUI();
+        initAvatars();
+        if (onComplete) onComplete(gltf);
+    };
+
+    const onFail = (err) => {
+        console.warn('Falha ao carregar modelo GLB primário:', err);
+        // Fallback para URL pública do Three.js com CORS liberado
+        if (typeof sourceUrlOrBuffer === 'string' && sourceUrlOrBuffer === 'xbot.glb') {
+            loader.load('https://threejs.org/examples/models/gltf/Xbot.glb', onSuccess, undefined, (fallbackErr) => {
+                console.warn('Fallback online também falhou:', fallbackErr);
+                glbLoading = false;
+                state.avatarModel = 'estilizado';
+                updateAvatarModelUI();
+                initAvatars();
+                if (onError) onError(fallbackErr);
+            });
+            return;
+        }
+        glbLoading = false;
+        state.avatarModel = 'estilizado';
+        updateAvatarModelUI();
+        initAvatars();
+        if (onError) onError(err);
+    };
+
+    if (sourceUrlOrBuffer instanceof ArrayBuffer) {
+        loader.parse(sourceUrlOrBuffer, '', onSuccess, onFail);
+    } else {
+        loader.load(sourceUrlOrBuffer, onSuccess, undefined, onFail);
+    }
+}
+
+function clearAvatars() {
+    if (allAvatars && allAvatars.length > 0) {
+        allAvatars.forEach(a => {
+            if (a.group && scene) scene.remove(a.group);
+        });
+        allAvatars = [];
+    }
+}
+
 function initAvatars() {
-    allAvatars = [];
-    
-    const mainAvatar = createSingleAvatar(true, 0, 0, 1.0, 0xffccaa, 0x2c3e50, 0x1d2d44);
+    clearAvatars();
+
+    const isUsingGLB = (state.avatarModel === 'realista' && glbTemplate);
+    const createFn = (isMain, x, z, scale, skin, shirt, pants) => {
+        if (isUsingGLB) {
+            return createGLBAvatar(isMain, x, z, scale, glbTemplate);
+        } else {
+            return createSingleAvatar(isMain, x, z, scale, skin, shirt, pants);
+        }
+    };
+
+    const mainAvatar = createFn(true, 0, 0, 1.0, 0xffccaa, 0x2c3e50, 0x1d2d44);
     mainAvatar.group.userData.fileBaseX = 0;
     mainAvatar.group.userData.fileBaseZ = 0;
     mainAvatar.group.userData.fileBaseRotY = 0;
@@ -3524,7 +3788,6 @@ function initAvatars() {
     const shirtColors  = [0x2c3e50, 0x9b2226, 0x005f73, 0x0a9396, 0xca6702, 0xbb3e03, 0x4a4e69, 0x2a9d8f, 0xe76f51, 0x3d5a80];
     const pantsColors  = [0x1d2d44, 0x1f2421, 0x2b2d42, 0x353b48, 0x273c75, 0x3d3d3d, 0x4b4b4b];
 
-    // Opção 1: turma em fileiras, com espaçamento fixo para evitar colisões.
     const formationRows = [
         { count: 6,  z: -52,  spacing: 30, scaleBase: 0.92 },
         { count: 8,  z: -88,  spacing: 29, scaleBase: 0.88 },
@@ -3542,7 +3805,7 @@ function initAvatars() {
             const skin  = skinColors[Math.floor(Math.random() * skinColors.length)];
             const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
             const pants = pantsColors[Math.floor(Math.random() * pantsColors.length)];
-            const clone = createSingleAvatar(false, x, z, scale, skin, shirt, pants);
+            const clone = createFn(false, x, z, scale, skin, shirt, pants);
             clone.group.visible = false;
             clone.group.userData.formationRow = rowIndex + 1;
             clone.group.userData.formationCol = i + 1;
@@ -3555,7 +3818,8 @@ function initAvatars() {
     });
 
     assignCircleFormation();
-    setTurmaLayout('off');
+    setTurmaLayout(state.turmaLayout || 'off');
+    updateAvatarModelUI();
 }
 
 function assignCircleFormation() {
@@ -3759,7 +4023,7 @@ function animate3D() {
         avatar.group.rotation.y += diff * 0.15;
 
         const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
-        const baseHeight = 7.0;
+        const baseHeight = avatar.isGLB ? 0.0 : 7.0;
         const walkLift = walkingIntensity * 0.2;
         const walkBounce = Math.abs(Math.cos(walkClock + clonePhaseOffset)) * 0.5 * walkingIntensity;
 
@@ -3782,132 +4046,211 @@ function animate3D() {
             const shinPivot = avatar.parts[side].shinPivot;
             const footMesh  = avatar.parts[side].meshes['Pé'];
 
-            // Caminhada automática durante o deslocamento.
-            // O balanço é alternado: quando uma perna vai à frente, a outra vai para trás.
+            if (!armPivot || !legPivot || !shinPivot) return;
+
+            // Caminhada automática durante o deslocamento
             const phase = walkClock + clonePhaseOffset + (side === 'L' ? 0 : Math.PI);
             const swing = Math.sin(phase) * 0.42 * walkingIntensity;
             const kneeBend = Math.max(0, Math.sin(phase + Math.PI / 2)) * 0.42 * walkingIntensity;
 
-            if (!legPivot.userData.isAnimating) {
-                legPivot.rotation.x += ((legPivot.userData.restingRot.x + swing) - legPivot.rotation.x) * 0.35;
-            }
-            if (!shinPivot.userData.isAnimating) {
-                shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
-            }
-            if (footMesh) {
-                footMesh.rotation.x += ((-kneeBend * 0.45) - footMesh.rotation.x) * 0.35;
-            }
-            if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
-                armPivot.rotation.x += ((armPivot.userData.restingRot.x - swing * 0.45) - armPivot.rotation.x) * 0.25;
-                armPivot.rotation.z += (armPivot.userData.restingRot.z - armPivot.rotation.z) * 0.2;
-            }
-
-            // Articulação do cotovelo na caminhada se não estiver em animação (curva para a frente, ou seja, rotation.x negativa)
-            const forearmPivot = avatar.parts[side].forearmPivot;
-            if (forearmPivot && !forearmPivot.userData.isAnimating) {
-                const walkElbow = walkingIntensity > 0.01 ? -(0.15 + Math.abs(swing) * 0.3) : 0;
-                forearmPivot.rotation.x += (walkElbow - forearmPivot.rotation.x) * 0.2;
-            }
-
-            // Animação do braço (ombro)
-            if (armPivot.userData.isAnimating) {
-                armPivot.userData.animProgress += 0.12; 
-                if (armPivot.userData.animProgress >= 1) {
-                    armPivot.userData.isAnimating = false;
-                    armPivot.rotation.copy(armPivot.userData.restingRot);
-                } else {
-                    const p      = armPivot.userData.animProgress;
-                    const bounce = Math.sin(p * Math.PI); 
-                    let targetX = 0, targetZ = armPivot.userData.restingRot.z;
-                    switch(armPivot.userData.animType) {
-                        case 'Peito':  targetX = -1.0; targetZ = sign * 0.4;  break; // Cotovelo para fora
-                        case 'Palma':  targetX = -0.8; targetZ = sign * -0.8; break; // Braços para frente/dentro
-                        case 'Estalo': targetX = -1.0; targetZ = sign * 0.8;  break; // Mais para cima e mais para fora/longe
-                        case 'Coxa':   targetX = 0.3;  targetZ = sign * -0.2; break; // Mão vai para baixo/trás-coxa
-                        case 'Pé':     targetX = -0.3; targetZ = sign * 0.2;  break; // Balanço
-                    }
-                    armPivot.rotation.x = armPivot.userData.restingRot.x + (targetX - armPivot.userData.restingRot.x) * bounce;
-                    armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
+            if (avatar.isGLB) {
+                // ---- MODELO REALISTA (GLB) ----
+                if (!legPivot.userData.isAnimating) {
+                    legPivot.rotation.x += ((legPivot.userData.restingRot.x + (side === 'L' ? -swing : swing)) - legPivot.rotation.x) * 0.35;
                 }
-            }
-
-            // Animação do antebraço (cotovelo)
-            if (forearmPivot && forearmPivot.userData.isAnimating) {
-                forearmPivot.userData.animProgress += 0.12;
-                if (forearmPivot.userData.animProgress >= 1) {
-                    forearmPivot.userData.isAnimating = false;
-                    forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
-                } else {
-                    const p      = forearmPivot.userData.animProgress;
-                    const bounce = Math.sin(p * Math.PI);
-                    let targetX = 0, targetZ = forearmPivot.userData.restingRot.z;
-                    switch(forearmPivot.userData.animType) {
-                        case 'Peito':  targetX = -1.6; targetZ = sign * -0.8; break; // Dobra cotovelo a 90+ graus para frente
-                        case 'Palma':  targetX = -0.8; targetZ = sign * -0.4; break; // Dobra cotovelo levemente para frente
-                        case 'Estalo': targetX = -0.8; targetZ = sign * 0.2;  break; // Mais para cima e mais para fora/longe
-                        case 'Coxa':   targetX = -1.0; targetZ = sign * -0.4; break; // Dobra cotovelo em direção à coxa para frente
-                        case 'Pé':     targetX = -0.2; targetZ = 0;           break; // Dobra cotovelo levemente para frente
-                    }
-                    forearmPivot.rotation.x = forearmPivot.userData.restingRot.x + (targetX - forearmPivot.userData.restingRot.x) * bounce;
-                    forearmPivot.rotation.z = forearmPivot.userData.restingRot.z + (targetZ - forearmPivot.userData.restingRot.z) * bounce;
+                if (!shinPivot.userData.isAnimating) {
+                    shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
                 }
-            }
-
-            // Animação da coxa (legPivot = quadril)
-            if (legPivot.userData.isAnimating) {
-                legPivot.userData.animProgress += 0.12;
-                if (legPivot.userData.animProgress >= 1) {
-                    legPivot.userData.isAnimating = false;
-                    legPivot.rotation.copy(legPivot.userData.restingRot);
-                } else {
-                    const p      = legPivot.userData.animProgress;
-                    const bounce = Math.sin(p * Math.PI);
-                    let targetX = 0;
-                    if (legPivot.userData.animType === 'Pé') {
-                        targetX = -0.5;
-                    }
-                    legPivot.rotation.x = legPivot.userData.restingRot.x + (targetX - legPivot.userData.restingRot.x) * bounce;
+                if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
+                    armPivot.rotation.y += ((side === 'L' ? swing * 0.5 : -swing * 0.5) - armPivot.rotation.y) * 0.25;
                 }
-            }
 
-            // Animação da canela (shinPivot = joelho)
-            if (shinPivot.userData.isAnimating) {
-                shinPivot.userData.animProgress += 0.12;
-                if (shinPivot.userData.animProgress >= 1) {
-                    shinPivot.userData.isAnimating = false;
-                    shinPivot.rotation.copy(shinPivot.userData.restingRot);
-                } else {
-                    const p      = shinPivot.userData.animProgress;
-                    const bounce = Math.sin(p * Math.PI);
-                    let targetX = 0;
-                    // Pé: dobra o joelho para chutar; Coxa: leve dobra residual
-                    switch(shinPivot.userData.animType) {
-                        case 'Pé':   targetX = 0.55; break;  // dobra o joelho (kick)
-                        case 'Coxa': targetX = 0.15; break;  // quase nada, só a coxa se move
+                if (armPivot.userData.isAnimating) {
+                    armPivot.userData.animProgress += 0.12; 
+                    if (armPivot.userData.animProgress >= 1) {
+                        armPivot.userData.isAnimating = false;
+                        armPivot.rotation.copy(armPivot.userData.restingRot);
+                    } else {
+                        const p      = armPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI); 
+                        let targetY = 0, targetZ = armPivot.userData.restingRot.z;
+                        switch(armPivot.userData.animType) {
+                            case 'Peito':  targetY = sign * 0.85; targetZ = armPivot.userData.restingRot.z + sign * 0.45; break;
+                            case 'Palma':  targetY = sign * 1.05; targetZ = armPivot.userData.restingRot.z + sign * 0.65; break;
+                            case 'Estalo': targetY = sign * 0.5;  targetZ = armPivot.userData.restingRot.z - sign * 0.8;  break;
+                            case 'Coxa':   targetY = -sign * 0.25; targetZ = armPivot.userData.restingRot.z + sign * 0.2; break;
+                            default:       targetY = sign * 0.4;  targetZ = armPivot.userData.restingRot.z;
+                        }
+                        armPivot.rotation.y = targetY * bounce;
+                        armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
                     }
-                    shinPivot.rotation.x = shinPivot.userData.restingRot.x + (targetX - shinPivot.userData.restingRot.x) * bounce;
+                }
+
+                const forearmPivot = avatar.parts[side].forearmPivot;
+                if (forearmPivot && forearmPivot.userData.isAnimating) {
+                    forearmPivot.userData.animProgress += 0.12;
+                    if (forearmPivot.userData.animProgress >= 1) {
+                        forearmPivot.userData.isAnimating = false;
+                        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
+                    } else {
+                        const p      = forearmPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        let targetY = 0;
+                        switch(forearmPivot.userData.animType) {
+                            case 'Peito':  targetY = sign * 1.5; break;
+                            case 'Palma':  targetY = sign * 1.2; break;
+                            case 'Estalo': targetY = sign * 1.1; break;
+                            case 'Coxa':   targetY = sign * 0.6; break;
+                            default:       targetY = sign * 0.5;
+                        }
+                        forearmPivot.rotation.y = targetY * bounce;
+                    }
+                }
+
+                if (legPivot.userData.isAnimating) {
+                    legPivot.userData.animProgress += 0.12;
+                    if (legPivot.userData.animProgress >= 1) {
+                        legPivot.userData.isAnimating = false;
+                        legPivot.rotation.copy(legPivot.userData.restingRot);
+                    } else {
+                        const p      = legPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        legPivot.rotation.x = legPivot.userData.restingRot.x + (-0.55 * bounce);
+                    }
+                }
+
+                if (shinPivot.userData.isAnimating) {
+                    shinPivot.userData.animProgress += 0.12;
+                    if (shinPivot.userData.animProgress >= 1) {
+                        shinPivot.userData.isAnimating = false;
+                        shinPivot.rotation.copy(shinPivot.userData.restingRot);
+                    } else {
+                        const p      = shinPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        shinPivot.rotation.x = shinPivot.userData.restingRot.x + (0.55 * bounce);
+                    }
+                }
+            } else {
+                // ---- MODELO ESTILIZADO (PROCEDURAL) ----
+                if (!legPivot.userData.isAnimating) {
+                    legPivot.rotation.x += ((legPivot.userData.restingRot.x + swing) - legPivot.rotation.x) * 0.35;
+                }
+                if (!shinPivot.userData.isAnimating) {
+                    shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
+                }
+                if (footMesh) {
+                    footMesh.rotation.x += ((-kneeBend * 0.45) - footMesh.rotation.x) * 0.35;
+                }
+                if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
+                    armPivot.rotation.x += ((armPivot.userData.restingRot.x - swing * 0.45) - armPivot.rotation.x) * 0.25;
+                    armPivot.rotation.z += (armPivot.userData.restingRot.z - armPivot.rotation.z) * 0.2;
+                }
+
+                const forearmPivot = avatar.parts[side].forearmPivot;
+                if (forearmPivot && !forearmPivot.userData.isAnimating) {
+                    const walkElbow = walkingIntensity > 0.01 ? -(0.15 + Math.abs(swing) * 0.3) : 0;
+                    forearmPivot.rotation.x += (walkElbow - forearmPivot.rotation.x) * 0.2;
+                }
+
+                if (armPivot.userData.isAnimating) {
+                    armPivot.userData.animProgress += 0.12; 
+                    if (armPivot.userData.animProgress >= 1) {
+                        armPivot.userData.isAnimating = false;
+                        armPivot.rotation.copy(armPivot.userData.restingRot);
+                    } else {
+                        const p      = armPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI); 
+                        let targetX = 0, targetZ = armPivot.userData.restingRot.z;
+                        switch(armPivot.userData.animType) {
+                            case 'Peito':  targetX = -1.0; targetZ = sign * 0.4;  break;
+                            case 'Palma':  targetX = -0.8; targetZ = sign * -0.8; break;
+                            case 'Estalo': targetX = -1.0; targetZ = sign * 0.8;  break;
+                            case 'Coxa':   targetX = 0.3;  targetZ = sign * -0.2; break;
+                            case 'Pé':     targetX = -0.3; targetZ = sign * 0.2;  break;
+                        }
+                        armPivot.rotation.x = armPivot.userData.restingRot.x + (targetX - armPivot.userData.restingRot.x) * bounce;
+                        armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
+                    }
+                }
+
+                if (forearmPivot && forearmPivot.userData.isAnimating) {
+                    forearmPivot.userData.animProgress += 0.12;
+                    if (forearmPivot.userData.animProgress >= 1) {
+                        forearmPivot.userData.isAnimating = false;
+                        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
+                    } else {
+                        const p      = forearmPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        let targetX = 0, targetZ = forearmPivot.userData.restingRot.z;
+                        switch(forearmPivot.userData.animType) {
+                            case 'Peito':  targetX = -1.6; targetZ = sign * -0.8; break;
+                            case 'Palma':  targetX = -0.8; targetZ = sign * -0.4; break;
+                            case 'Estalo': targetX = -0.8; targetZ = sign * 0.2;  break;
+                            case 'Coxa':   targetX = -1.0; targetZ = sign * -0.4; break;
+                            case 'Pé':     targetX = -0.2; targetZ = 0;           break;
+                        }
+                        forearmPivot.rotation.x = forearmPivot.userData.restingRot.x + (targetX - forearmPivot.userData.restingRot.x) * bounce;
+                        forearmPivot.rotation.z = forearmPivot.userData.restingRot.z + (targetZ - forearmPivot.userData.restingRot.z) * bounce;
+                    }
+                }
+
+                if (legPivot.userData.isAnimating) {
+                    legPivot.userData.animProgress += 0.12;
+                    if (legPivot.userData.animProgress >= 1) {
+                        legPivot.userData.isAnimating = false;
+                        legPivot.rotation.copy(legPivot.userData.restingRot);
+                    } else {
+                        const p      = legPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        let targetX = 0;
+                        if (legPivot.userData.animType === 'Pé') {
+                            targetX = -0.5;
+                        }
+                        legPivot.rotation.x = legPivot.userData.restingRot.x + (targetX - legPivot.userData.restingRot.x) * bounce;
+                    }
+                }
+
+                if (shinPivot.userData.isAnimating) {
+                    shinPivot.userData.animProgress += 0.12;
+                    if (shinPivot.userData.animProgress >= 1) {
+                        shinPivot.userData.isAnimating = false;
+                        shinPivot.rotation.copy(shinPivot.userData.restingRot);
+                    } else {
+                        const p      = shinPivot.userData.animProgress;
+                        const bounce = Math.sin(p * Math.PI);
+                        let targetX = 0;
+                        switch(shinPivot.userData.animType) {
+                            case 'Pé':   targetX = 0.55; break;
+                            case 'Coxa': targetX = 0.15; break;
+                        }
+                        shinPivot.rotation.x = shinPivot.userData.restingRot.x + (targetX - shinPivot.userData.restingRot.x) * bounce;
+                    }
                 }
             }
 
             // Animação de escala + glow dos meshes
             const meshesProcessed = new Set(); 
             Object.values(avatar.parts[side].meshes).forEach(mesh => {
-                if(meshesProcessed.has(mesh)) return;
+                if(!mesh || meshesProcessed.has(mesh)) return;
                 meshesProcessed.add(mesh);
 
-                if(mesh.userData.isAnimating) {
-                    mesh.scale.x += (mesh.userData.targetScale - mesh.scale.x) * 0.3;
-                    mesh.scale.y += (mesh.userData.targetScale - mesh.scale.y) * 0.3;
-                    mesh.scale.z += (mesh.userData.targetScale - mesh.scale.z) * 0.3;
-                    mesh.material.emissiveIntensity -= 0.05;
-                    if(mesh.material.emissiveIntensity < 0) mesh.material.emissiveIntensity = 0;
-                    if(mesh.scale.x > mesh.userData.targetScale * 0.95) {
+                if(mesh.userData && mesh.userData.isAnimating) {
+                    if (mesh.scale) {
+                        mesh.scale.x += (mesh.userData.targetScale - mesh.scale.x) * 0.3;
+                        mesh.scale.y += (mesh.userData.targetScale - mesh.scale.y) * 0.3;
+                        mesh.scale.z += (mesh.userData.targetScale - mesh.scale.z) * 0.3;
+                    }
+                    if (mesh.material && typeof mesh.material.emissiveIntensity === 'number') {
+                        mesh.material.emissiveIntensity -= 0.05;
+                        if(mesh.material.emissiveIntensity < 0) mesh.material.emissiveIntensity = 0;
+                    }
+                    if(mesh.scale && mesh.scale.x > mesh.userData.targetScale * 0.95) {
                         mesh.userData.targetScale = 1.0; 
                     }
-                    if(mesh.userData.targetScale === 1.0 && mesh.scale.x < 1.05) {
+                    if(mesh.userData.targetScale === 1.0 && (!mesh.scale || mesh.scale.x < 1.05)) {
                         mesh.userData.isAnimating = false;
-                        mesh.scale.set(1, 1, 1);
-                        mesh.material.emissiveIntensity = 0;
+                        if (mesh.scale) mesh.scale.set(1, 1, 1);
+                        if (mesh.material && typeof mesh.material.emissiveIntensity === 'number') mesh.material.emissiveIntensity = 0;
                     }
                 }
             });

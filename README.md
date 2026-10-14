@@ -26,7 +26,10 @@ Uma janela flutuante que desenha em tempo real a partitura rítmica corresponden
 *   Inclui um marcador visual (playhead) sincronizado com a execução do áudio para acompanhamento de leitura.
 
 ### 3. Palco 3D Interativo
-*   Avatares tridimensionais (renderizados com Three.js) que realizam as animações correspondentes a cada golpe percussivo, giro e deslocamento na tela.
+*   **Dois Estilos de Avatar**:
+    *   **Avatar Realista (GLB)**: Suporte a modelos 3D humanos com malha contínua e esqueleto (*rigging* padrão Mixamo/Three.js), com rotações anatômicas dos ossos integradas às batidas corporais e caminhada.
+    *   **Avatar Estilizado (Nativo)**: Modelo procedural de alta performance com proporções anatômicas refinadas, olhos vivos com *catchlight*, mãos expressivas e tênis esportivos (*sneakers*).
+    *   **Carregador de Modelos (.GLB)**: Permite importar qualquer arquivo de personagem 3D `.glb` ou `.gltf` (do Mixamo, Ready Player Me, etc.) diretamente pelo navegador.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
 *   **Efeito Coletivo**: No modo turma, é aplicado um leve atraso espacial (delay e reverb) para emular o som acústico de um grupo de pessoas tocando em uma sala de aula.
 
