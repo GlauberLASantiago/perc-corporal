@@ -30,8 +30,9 @@ Uma janela flutuante que desenha em tempo real a partitura rítmica corresponden
     *   **🎨 Boneco de Madeira (Manequim Artístico - Recomendado)**: O clássico manequim articulado de ateliê em madeira nobre torneada (faia e nogueira). Totalmente livre de estranheza (*uncanny valley*), acolhedor, elegante e ideal para ambientes de educação musical.
     *   **🤖 Mascote Robô (Astro Bot)**: Robozinho simpático e carismático com chassi branco perolado, visor escuro com olhinhos felizes luminosos `( ^ _ ^ )` e núcleo percussivo no peito.
     *   **🎓 Estudante Casual**: Personagem jovem estilizado com camiseta colorida, calça jeans casual e tênis esportivos modernos (*sneakers*).
+    *   **🏃 Atleta (Roupa de Exercícios)**: Visual moderno esportivo para treino e exercícios físicos, com camiseta dry-fit respirável, bermuda atlética de corrida com listras duplas, faixa de suor na cabeça (*headband*), *smartwatch* no pulso, munhequeira atoalhada e tênis *running* com amortecimento *Air*.
     *   **✨ Minimalista Nórdico**: Estética limpa de ateliê com geometria pura, tons foscos harmoniosos (ardósia, terracota e sálvia) e detalhes em bronze escovado.
-    *   **🦾 Manequim GLB (Técnico)**: Modelo 3D com malha contínua e esqueleto de ossos (*rigging* Mixamo).
+    *   **🪖 Traje de Combate (GLB / Mixamo)**: Modelo 3D humano com uniforme militar tático camuflado, jaqueta, calça cargo com bolsos, cinto de equipamentos, botas de combate e esqueleto Mixamo animado.
     *   **📁 Carregador de Modelos Customizados**: Permite carregar qualquer arquivo `.glb` ou `.gltf` do computador diretamente pela interface do mostruário.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
 *   **Efeito Coletivo**: No modo turma, é aplicado um leve atraso espacial (delay e reverb) para emular o som acústico de um grupo de pessoas tocando em uma sala de aula.

@@ -1143,13 +1143,23 @@ const AVATAR_STYLES = [
     },
     {
         id: 'realista_glb',
-        icon: '🧍',
-        name: 'Personagem com Roupas (GLB)',
-        subtitle: 'Modelo 3D com Uniforme e Botas',
-        badge: '👕 Com Roupas',
+        icon: '🪖',
+        name: 'Traje de Combate (GLB)',
+        subtitle: 'Uniforme Militar Tático Mixamo',
+        badge: '🎖️ Tático',
         badgeColor: '#2563eb',
-        description: 'Modelo 3D humano com roupas reais (jaqueta, calça, cinto e botas) e texturas detalhadas. Sem nenhum aspecto de esqueleto vermelho, com esqueleto de ossos Mixamo 100% animado.',
-        features: ['Roupas e jaqueta completas', 'Botas e texturas reais', 'Esqueleto Mixamo animado', 'Sem aspecto de esqueleto']
+        description: 'Modelo 3D com uniforme tático de combate (jaqueta militar camuflada, calça cargo com bolsos táticos, cinto de equipamentos e botas de combate) animado com esqueleto Mixamo.',
+        features: ['Uniforme tático de combate', 'Jaqueta e calça camuflada', 'Botas de combate militares', 'Esqueleto Mixamo animado']
+    },
+    {
+        id: 'atleta_exercicios',
+        icon: '🏃',
+        name: 'Atleta (Roupa de Exercícios)',
+        subtitle: 'Treino, Fitness & Movimento',
+        badge: '⚡ Atividade Física',
+        badgeColor: '#10b981',
+        description: 'Visual esportivo moderno para treino e exercícios com camiseta dry-fit respirável, bermuda atlética de corrida com listras, faixa de suor na cabeça, smartwatch no pulso e tênis de corrida running com amortecimento.',
+        features: ['Camiseta dry-fit esportiva', 'Bermuda atlética de treino', 'Smartwatch e munhequeira', 'Tênis running amortecido']
     }
 ];
 
@@ -3284,6 +3294,8 @@ function createSingleAvatar(styleId, isMain, x, z, scaleParam, skinHex, shirtHex
         return buildMascoteRobo(isMain, x, z, scaleParam);
     } else if (activeStyle === 'minimalista') {
         return buildMinimalistaNordico(isMain, x, z, scaleParam);
+    } else if (activeStyle === 'atleta_exercicios') {
+        return buildAtletaExercicios(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex);
     } else {
         return buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex);
     }
@@ -3925,6 +3937,532 @@ function buildMinimalistaNordico(isMain, x, z, scaleParam) {
         footGroup.add(footMesh);
 
         shinPivot.add(footGroup);
+        legPivot.add(shinPivot);
+        group.add(legPivot);
+
+        parts[side].legPivot  = legPivot;
+        parts[side].shinPivot = shinPivot;
+        parts[side].meshes['Coxa'] = thighMesh;
+        parts[side].meshes['Pé']   = footMesh;
+    });
+
+    return { group, parts, isMain, id: Math.random().toString(36).substring(7) };
+}
+
+/**
+ * buildAtletaExercicios — Personagem esportivo com roupas completas de exercícios e treino:
+ * - Camiseta dry-fit respirável com recortes de ventilação nas laterais e logo atlético
+ * - Bermuda de corrida esportiva com cós elástico, amarração frontal e listras laterais duplas
+ * - Faixa elástica esportiva de suor na cabeça (headband)
+ * - Smartwatch fitness com mostrador digital no pulso esquerdo
+ * - Munhequeira esportiva atoalhada no pulso direito
+ * - Meias esportivas brancas de cano médio com listras atléticas
+ * - Tênis de corrida running com entressola de amortecimento e cápsula de ar (Air cushion)
+ * - Almofadas de impacto sonoro responsivas no Peito, Palmas/Estalos, Coxas e Pés
+ */
+function buildAtletaExercicios(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex) {
+    const group = new THREE.Group();
+    // Elevado 7 unidades para que o solado do tênis de corrida toque o palco perfeitamente
+    group.position.set(x, 7, z);
+    group.userData.baseX = x;
+    group.userData.baseZ = z;
+    group.userData.baseRotY = 0;
+    group.userData.fileBaseX = x;
+    group.userData.fileBaseZ = z;
+    group.userData.fileBaseRotY = 0;
+    group.userData.circleBaseX = x;
+    group.userData.circleBaseZ = z;
+    group.userData.circleBaseRotY = 0;
+    group.scale.set(scaleParam, scaleParam, scaleParam);
+    
+    const parts = {
+        L: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} },
+        R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
+    };
+
+    const sHex = skinHex || 0xffccaa;
+    // Cor vibrante para o dry-fit esportivo (turquesa atlético no avatar principal ou tom da turma)
+    const topHex = shirtHex || (isMain ? 0x0284c7 : 0x0ea5e9);
+    // Bermuda esportiva de treino em grafite técnico escuro
+    const bottomHex = pantsHex || 0x1e293b;
+
+    const matSkin        = new THREE.MeshStandardMaterial({ color: sHex, roughness: 0.52, metalness: 0.04 });
+    const matDryFit      = new THREE.MeshStandardMaterial({ color: topHex, roughness: 0.65, metalness: 0.08 });
+    const matMeshPanel   = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.88, metalness: 0.02 });
+    const matShorts      = new THREE.MeshStandardMaterial({ color: bottomHex, roughness: 0.75, metalness: 0.04 });
+    const matStripeWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.08 });
+    const matAccentCyan  = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.35, metalness: 0.15 });
+    const matSocks       = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.78, metalness: 0.02 });
+    const matShoeBody    = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.58, metalness: 0.06 });
+    const matShoeSole    = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.72, metalness: 0.02 });
+    const matShoeAir     = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.2, metalness: 0.4, transparent: true, opacity: 0.75 });
+    const matHeadband    = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.75, metalness: 0.05 });
+    const matWristband   = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.82, metalness: 0.02 });
+    const matSmartwatch  = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.4 });
+    const matWatchScreen = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+
+    const setupGlowAndShadow = (mesh) => {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.baseColor = mesh.material.color.clone();
+        mesh.userData.targetScale = 1.0;
+        mesh.userData.isAnimating = false;
+    };
+
+    // Cores de cabelo esportivo
+    let hairColor = 0x18120c;
+    if (sHex === 0xffccaa || sHex === 0xffbfa3) {
+        const choices = [0x1e1510, 0x3d271d, 0x1c1917, 0x451a03];
+        hairColor = choices[Math.floor(Math.random() * choices.length)];
+    } else {
+        hairColor = 0x0c0a09;
+    }
+    const matHair     = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0.05 });
+    const matEyeWhite = new THREE.MeshStandardMaterial({ color: 0xfdfdfd, roughness: 0.2 });
+    const matIris     = new THREE.MeshStandardMaterial({ color: 0x241711, roughness: 0.3 });
+    const matPupil    = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1 });
+    const matCatch    = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+    // ==========================================
+    // CABEÇA COM FAIXA ESPORTIVA (HEADBAND)
+    // ==========================================
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 38, 0);
+
+    const headGeo = new THREE.SphereGeometry(5.6, 32, 28);
+    const head = new THREE.Mesh(headGeo, matSkin);
+    head.scale.set(0.97, 1.08, 1.02);
+    head.castShadow = true;
+    headGroup.add(head);
+
+    const jawGeo = new THREE.SphereGeometry(3.0, 20, 16);
+    const jaw = new THREE.Mesh(jawGeo, matSkin);
+    jaw.position.set(0, -3.2, 1.8);
+    jaw.scale.set(0.9, 0.7, 1.1);
+    headGroup.add(jaw);
+
+    // Olhos expressivos com catchlight
+    [-1, 1].forEach(eyeSign => {
+        const eyeX = eyeSign * 1.8;
+        const eyeY = 0.7;
+        const eyeZ = 4.8;
+
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 20), matEyeWhite);
+        sclera.position.set(eyeX, eyeY, eyeZ);
+        sclera.scale.set(1.05, 0.9, 0.55);
+        headGroup.add(sclera);
+
+        const iris = new THREE.Mesh(new THREE.CircleGeometry(0.48, 18), matIris);
+        iris.position.set(eyeX, eyeY, eyeZ + 0.46);
+        headGroup.add(iris);
+
+        const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.28, 18), matPupil);
+        pupil.position.set(eyeX, eyeY, eyeZ + 0.47);
+        headGroup.add(pupil);
+
+        const catchlight = new THREE.Mesh(new THREE.CircleGeometry(0.1, 12), matCatch);
+        catchlight.position.set(eyeX + 0.12, eyeY + 0.12, eyeZ + 0.48);
+        headGroup.add(catchlight);
+
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.35, 0.5), matHair);
+        brow.position.set(eyeX, eyeY + 1.6, eyeZ + 0.25);
+        brow.rotation.z = -eyeSign * 0.12;
+        headGroup.add(brow);
+
+        const earOuter = new THREE.Mesh(new THREE.SphereGeometry(1.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), matSkin);
+        earOuter.position.set(eyeSign * 5.6, 0.2, -0.2);
+        earOuter.rotation.z = eyeSign * (Math.PI / 2);
+        earOuter.scale.set(0.7, 1.2, 0.9);
+        headGroup.add(earOuter);
+    });
+
+    // Nariz atlético
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.65, 16, 16), matSkin);
+    nose.position.set(0, -0.6, 5.65);
+    nose.scale.set(1.0, 0.85, 1.0);
+    headGroup.add(nose);
+
+    // Sorriso animado
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.18, 10, 20, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xa84344, roughness: 0.6 }));
+    mouth.position.set(0, -2.1, 4.8);
+    mouth.rotation.set(-0.35, 0, -Math.PI * 0.77);
+    headGroup.add(mouth);
+
+    // Faixa elástica esportiva de suor (Headband)
+    const headband = new THREE.Mesh(new THREE.TorusGeometry(5.45, 0.48, 14, 36), matHeadband);
+    headband.position.set(0, 2.3, 0.2);
+    headband.rotation.x = Math.PI / 2 + 0.1;
+    headband.scale.set(1.0, 1.05, 0.85);
+    headband.castShadow = true;
+    headGroup.add(headband);
+
+    // Cabelo esportivo (curto, dinâmico)
+    const hairBase = new THREE.Mesh(new THREE.SphereGeometry(5.95, 28, 20), matHair);
+    hairBase.position.set(0, 1.8, -0.6);
+    hairBase.scale.set(0.99, 1.05, 1.05);
+    headGroup.add(hairBase);
+
+    const hairTuft = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2.2, 4.2), matHair);
+    hairTuft.position.set(0, 5.1, 1.5);
+    hairTuft.rotation.x = -0.25;
+    headGroup.add(hairTuft);
+
+    group.add(headGroup);
+
+    // ==========================================
+    // PESCOÇO E CAMISETA DRY-FIT
+    // ==========================================
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.4, 4.6, 18), matSkin);
+    neck.position.set(0, 32.5, 0);
+    neck.castShadow = true;
+    group.add(neck);
+
+    // Gola esportiva da camiseta
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(2.7, 0.4, 12, 24), matDryFit);
+    collar.position.set(0, 33.6, 0);
+    collar.rotation.x = Math.PI / 2;
+    group.add(collar);
+
+    // Tórax Atlético Dry-fit
+    const chestTorso = new THREE.Mesh(new THREE.CylinderGeometry(6.6, 5.5, 8.5, 20), matDryFit);
+    chestTorso.position.set(0, 29.5, 0);
+    chestTorso.scale.set(1.05, 1.0, 0.88);
+    chestTorso.castShadow = true;
+    group.add(chestTorso);
+
+    // Recortes laterais respiráveis (painéis de ventilação mesh)
+    [-1, 1].forEach(sideSign => {
+        const ventPanel = new THREE.Mesh(new THREE.BoxGeometry(0.35, 7.8, 3.6), matMeshPanel);
+        ventPanel.position.set(sideSign * 6.2, 29.5, 0);
+        group.add(ventPanel);
+    });
+
+    // Abdômen / Cintura
+    const waist = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.7, 7.5, 20), matDryFit);
+    waist.position.set(0, 22.0, 0);
+    waist.scale.set(1.02, 1.0, 0.85);
+    waist.castShadow = true;
+    group.add(waist);
+
+    // Peitorais percussivos (brilham no ritmo de Peito)
+    const peitoralGeoL = new THREE.SphereGeometry(3.6, 20, 16);
+    peitoralGeoL.scale(1.05, 0.9, 0.55);
+    const chestL = new THREE.Mesh(peitoralGeoL, matDryFit.clone());
+    chestL.position.set(-3.2, 28.5, 3.0);
+    setupGlowAndShadow(chestL);
+    group.add(chestL);
+    parts.L.meshes['Peito'] = chestL;
+
+    const peitoralGeoR = new THREE.SphereGeometry(3.6, 20, 16);
+    peitoralGeoR.scale(1.05, 0.9, 0.55);
+    const chestR = new THREE.Mesh(peitoralGeoR, matDryFit.clone());
+    chestR.position.set(3.2, 28.5, 3.0);
+    setupGlowAndShadow(chestR);
+    group.add(chestR);
+    parts.R.meshes['Peito'] = chestR;
+
+    // Emblema esportivo no peito
+    const logoBadge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, 0.2), matAccentCyan);
+    logoBadge.position.set(-3.2, 30.2, 4.4);
+    logoBadge.rotation.z = -0.2;
+    group.add(logoBadge);
+
+    // ==========================================
+    // BERMUDA DE TREINO / CORRIDA (SHORTS)
+    // ==========================================
+    // Cós elástico da bermuda
+    const waistBand = new THREE.Mesh(new THREE.CylinderGeometry(5.9, 5.9, 1.8, 20), matShorts);
+    waistBand.position.set(0, 17.8, 0);
+    waistBand.scale.set(1.03, 1.0, 0.88);
+    waistBand.castShadow = true;
+    group.add(waistBand);
+
+    // Cordão de amarração esportivo frontal
+    const cordKnot = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 10), matStripeWhite);
+    cordKnot.position.set(0, 17.8, 5.4);
+    group.add(cordKnot);
+    [-0.35, 0.35].forEach(cX => {
+        const cordEnd = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.2, 8), matStripeWhite);
+        cordEnd.position.set(cX, 17.2, 5.45);
+        cordEnd.rotation.z = cX * 0.3;
+        group.add(cordEnd);
+    });
+
+    // Quadril / Pelvis da bermuda
+    const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 5.2, 3.2, 20), matShorts);
+    pelvis.position.set(0, 16.0, 0);
+    pelvis.scale.set(1.02, 1.0, 0.85);
+    pelvis.castShadow = true;
+    group.add(pelvis);
+
+    // ==========================================
+    // BRAÇOS E PERNAS
+    // ==========================================
+    ['L', 'R'].forEach(side => {
+        const isLeft = side === 'L';
+        const sign   = isLeft ? -1 : 1;
+
+        // ---- BRAÇO (Ombro com manga dry-fit) ----
+        const armPivot = new THREE.Group();
+        armPivot.position.set(sign * 9, 33, 0);
+        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18);
+        armPivot.rotation.copy(armPivot.userData.restingRot);
+        armPivot.userData.isAnimating = false;
+        armPivot.userData.animProgress = 0;
+
+        const shoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(2.4, 18, 18), matDryFit.clone());
+        shoulderMesh.castShadow = true;
+        armPivot.add(shoulderMesh);
+
+        // Manga curta esportiva
+        const sleeveGeo = new THREE.CylinderGeometry(2.35, 2.15, 3.8, 18);
+        sleeveGeo.translate(0, -1.9, 0);
+        const sleeveMesh = new THREE.Mesh(sleeveGeo, matDryFit.clone());
+        sleeveMesh.castShadow = true;
+        armPivot.add(sleeveMesh);
+
+        // Faixa na barra da manga
+        const sleeveTrim = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.18, 10, 20), matAccentCyan);
+        sleeveTrim.position.set(0, -3.8, 0);
+        sleeveTrim.rotation.x = Math.PI / 2;
+        armPivot.add(sleeveTrim);
+
+        // Braço superior atlético descoberto
+        const upperArmGeo = new THREE.CylinderGeometry(1.95, 1.7, 4.2, 18);
+        upperArmGeo.translate(0, -2.1, 0);
+        const upperArmMesh = new THREE.Mesh(upperArmGeo, matSkin.clone());
+        upperArmMesh.position.y = -3.8;
+        upperArmMesh.castShadow = true;
+        upperArmMesh.receiveShadow = true;
+        armPivot.add(upperArmMesh);
+
+        // ---- ANTEBRAÇO (Cotovelo, Smartwatch e Munhequeira) ----
+        const forearmPivot = new THREE.Group();
+        forearmPivot.position.set(0, -8.0, 0);
+        forearmPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
+        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
+        forearmPivot.userData.isAnimating = false;
+        forearmPivot.userData.animProgress = 0;
+
+        const elbow = new THREE.Mesh(new THREE.SphereGeometry(1.65, 16, 16), matSkin.clone());
+        elbow.castShadow = true;
+        forearmPivot.add(elbow);
+
+        const forearmGeo = new THREE.CylinderGeometry(1.65, 1.35, 7.0, 18);
+        forearmGeo.translate(0, -3.5, 0);
+        const forearmMesh = new THREE.Mesh(forearmGeo, matSkin.clone());
+        forearmMesh.castShadow = true;
+        forearmMesh.receiveShadow = true;
+        forearmPivot.add(forearmMesh);
+
+        // ACESSÓRIOS DE TREINO NOS PULSOS:
+        if (isLeft) {
+            // PULSO ESQUERDO: SMARTWATCH FITNESS
+            const watchStrap = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.48, 1.3, 16), matSmartwatch);
+            watchStrap.position.set(0, -6.0, 0);
+            watchStrap.castShadow = true;
+            forearmPivot.add(watchStrap);
+
+            const watchBody = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.6, 0.45), matSmartwatch);
+            watchBody.position.set(0, -6.0, 1.48);
+            watchBody.castShadow = true;
+            forearmPivot.add(watchBody);
+
+            const watchScreen = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.3, 0.1), matWatchScreen);
+            watchScreen.position.set(0, -6.0, 1.68);
+            forearmPivot.add(watchScreen);
+        } else {
+            // PULSO DIREITO: MUNHEQUEIRA ATOALHADA DE ACADEMIA
+            const wristbandMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.52, 1.52, 2.2, 16), matWristband);
+            wristbandMesh.position.set(0, -5.8, 0);
+            wristbandMesh.castShadow = true;
+            forearmPivot.add(wristbandMesh);
+
+            const wbStripe = new THREE.Mesh(new THREE.TorusGeometry(1.54, 0.1, 10, 20), matAccentCyan);
+            wbStripe.position.set(0, -5.8, 0);
+            wbStripe.rotation.x = Math.PI / 2;
+            forearmPivot.add(wbStripe);
+        }
+
+        // MÃOS ARTICULADAS (Palmas & Estalos)
+        const handMat = matSkin.clone();
+        const palmGeo = new THREE.BoxGeometry(2.9, 3.7, 1.1);
+        palmGeo.translate(0, -1.85, 0);
+        const handMesh = new THREE.Mesh(palmGeo, handMat);
+        handMesh.position.set(0, -7.0, 0);
+        setupGlowAndShadow(handMesh);
+
+        // Tenar
+        const tenarMesh = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), handMat);
+        tenarMesh.position.set(-sign * 1.3, -1.2, 0.2);
+        tenarMesh.scale.set(0.8, 1.2, 0.9);
+        handMesh.add(tenarMesh);
+
+        // Polegar
+        const thumbBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 1.5, 12), handMat);
+        thumbBase.position.set(-sign * 1.5, -1.8, 0.2);
+        thumbBase.rotation.z = sign * 0.42;
+        thumbBase.rotation.x = 0.35;
+        thumbBase.castShadow = true;
+        handMesh.add(thumbBase);
+
+        const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 12), handMat);
+        thumbTip.position.set(0, -0.75, 0);
+        thumbBase.add(thumbTip);
+
+        // Dedos
+        const fingerSpacing = 0.68;
+        const fingerLengths = [2.2, 2.5, 2.3, 1.75];
+        for (let i = 0; i < 4; i++) {
+            const length = fingerLengths[i];
+            const fingerGeo = new THREE.CylinderGeometry(0.32, 0.38, length, 12);
+            fingerGeo.translate(0, -length / 2, 0);
+            const fingerMesh = new THREE.Mesh(fingerGeo, handMat);
+            const fingerX = sign * (-1.5 + i) * fingerSpacing;
+            fingerMesh.position.set(fingerX, -3.7, 0);
+            fingerMesh.rotation.x = 0.15;
+            fingerMesh.castShadow = true;
+
+            const tipMesh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), handMat);
+            tipMesh.position.set(0, -length, 0);
+            fingerMesh.add(tipMesh);
+            handMesh.add(fingerMesh);
+        }
+
+        forearmPivot.add(handMesh);
+        armPivot.add(forearmPivot);
+        group.add(armPivot);
+
+        parts[side].armPivot = armPivot;
+        parts[side].forearmPivot = forearmPivot;
+        parts[side].meshes['Palma']  = handMesh;
+        parts[side].meshes['Estalo'] = handMesh;
+
+        // ---- PERNA (Bermuda esportiva + Coxa + Tênis Running) ----
+        const legPivot = new THREE.Group();
+        legPivot.position.set(sign * 3.8, 18, 0);
+        legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
+        legPivot.rotation.copy(legPivot.userData.restingRot);
+        legPivot.userData.isAnimating  = false;
+        legPivot.userData.animProgress = 0;
+
+        // Parte superior da perna coberta pela bermuda atlética
+        const shortsLegGeo = new THREE.CylinderGeometry(3.35, 3.05, 7.5, 18);
+        shortsLegGeo.translate(0, -3.75, 0);
+        const shortsLegMesh = new THREE.Mesh(shortsLegGeo, matShorts.clone());
+        shortsLegMesh.castShadow = true;
+        legPivot.add(shortsLegMesh);
+
+        // Listras laterais esportivas de corrida na bermuda
+        const stripe1 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 7.2, 0.45), matStripeWhite);
+        stripe1.position.set(sign * 3.3, -3.75, -0.3);
+        legPivot.add(stripe1);
+        const stripe2 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 7.2, 0.45), matAccentCyan);
+        stripe2.position.set(sign * 3.3, -3.75, 0.3);
+        legPivot.add(stripe2);
+
+        // Coxa descoberta abaixo da bermuda (Almofada percussiva Coxa)
+        const thighGeo = new THREE.CylinderGeometry(2.9, 2.6, 5.5, 18);
+        thighGeo.translate(0, -2.75, 0);
+        const thighMesh = new THREE.Mesh(thighGeo, matSkin.clone());
+        thighMesh.position.y = -7.0;
+        setupGlowAndShadow(thighMesh);
+        legPivot.add(thighMesh);
+
+        // Joelho atlético
+        const kneeMesh = new THREE.Mesh(new THREE.SphereGeometry(2.35, 16, 16), matSkin.clone());
+        kneeMesh.position.set(0, -12, 0.2);
+        kneeMesh.castShadow = true;
+        legPivot.add(kneeMesh);
+
+        // ShinPivot no joelho
+        const shinPivot = new THREE.Group();
+        shinPivot.position.set(0, -12, 0);
+        shinPivot.userData.restingRot  = new THREE.Euler(0, 0, 0);
+        shinPivot.rotation.copy(shinPivot.userData.restingRot);
+        shinPivot.userData.isAnimating  = false;
+        shinPivot.userData.animProgress = 0;
+
+        // Canela superior (pele)
+        const shinUpperGeo = new THREE.CylinderGeometry(2.4, 2.2, 3.8, 18);
+        shinUpperGeo.translate(0, -1.9, 0);
+        const shinUpper = new THREE.Mesh(shinUpperGeo, matSkin.clone());
+        shinUpper.castShadow = true;
+        shinPivot.add(shinUpper);
+
+        // Meia esportiva cano médio (branca com listras)
+        const sockGeo = new THREE.CylinderGeometry(2.25, 1.95, 7.2, 18);
+        sockGeo.translate(0, -3.6, 0);
+        const sockMesh = new THREE.Mesh(sockGeo, matSocks);
+        sockMesh.position.y = -3.8;
+        sockMesh.castShadow = true;
+        shinPivot.add(sockMesh);
+
+        // Listras na barra da meia
+        const sockStripe1 = new THREE.Mesh(new THREE.TorusGeometry(2.27, 0.12, 10, 20), matAccentCyan);
+        sockStripe1.position.set(0, -4.5, 0);
+        sockStripe1.rotation.x = Math.PI / 2;
+        shinPivot.add(sockStripe1);
+
+        const sockStripe2 = new THREE.Mesh(new THREE.TorusGeometry(2.22, 0.12, 10, 20), matStripeWhite);
+        sockStripe2.position.set(0, -5.0, 0);
+        sockStripe2.rotation.x = Math.PI / 2;
+        shinPivot.add(sockStripe2);
+
+        // ---- TÊNIS DE CORRIDA RUNNING (AIR CUSHION) ----
+        const shoeGroup = new THREE.Group();
+        shoeGroup.position.set(0, -11, 3.8);
+
+        // Corpo aerodinâmico do tênis
+        const shoeBodyGeo = new THREE.BoxGeometry(4.2, 2.7, 8.6);
+        const footMesh = new THREE.Mesh(shoeBodyGeo, matShoeBody.clone());
+        footMesh.position.set(0, 0, 0);
+        setupGlowAndShadow(footMesh);
+        shoeGroup.add(footMesh);
+
+        // Biqueira de proteção reforçada
+        const toe = new THREE.Mesh(new THREE.SphereGeometry(2.1, 16, 14), matShoeBody.clone());
+        toe.position.set(0, -0.1, 4.0);
+        toe.scale.set(0.98, 0.65, 0.85);
+        footMesh.add(toe);
+
+        // Painel de malha respirável na frente
+        const meshVamp = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.25, 3.2), matMeshPanel);
+        meshVamp.position.set(0, 1.38, 2.2);
+        footMesh.add(meshVamp);
+
+        // Listras dinâmicas de velocidade (Speed Swoosh)
+        [-1, 1].forEach(sideSign => {
+            const speedStripe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.65, 5.2), matAccentCyan);
+            speedStripe.position.set(sideSign * 2.15, 0.15, 0.1);
+            speedStripe.rotation.z = sideSign * 0.12;
+            footMesh.add(speedStripe);
+        });
+
+        // Entressola de amortecimento esportivo EVA
+        const soleGeo = new THREE.BoxGeometry(4.5, 0.9, 9.2);
+        const soleMesh = new THREE.Mesh(soleGeo, matShoeSole);
+        soleMesh.position.set(0, -1.35, 0.2);
+        footMesh.add(soleMesh);
+
+        const soleFront = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.9, 16, 1, false, 0, Math.PI), matShoeSole);
+        soleFront.position.set(0, -1.35, 4.6);
+        soleFront.rotation.y = Math.PI;
+        footMesh.add(soleFront);
+
+        // Cápsula de amortecimento translúcida (Air bubble no calcanhar)
+        const airBubble = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.45, 3.2), matShoeAir);
+        airBubble.position.set(0, -1.05, -2.2);
+        footMesh.add(airBubble);
+
+        // Cadarços elásticos rápidos de corrida
+        for (let l = 0; l < 3; l++) {
+            const lace = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.22, 0.55), matAccentCyan);
+            lace.position.set(0, 1.42, 0.5 + l * 1.05);
+            footMesh.add(lace);
+        }
+
+        shinPivot.add(shoeGroup);
         legPivot.add(shinPivot);
         group.add(legPivot);
 
