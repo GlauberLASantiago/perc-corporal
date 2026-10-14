@@ -4472,67 +4472,43 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
         return found;
     };
 
-    const armPivotL = findBone(/leftarm$/i);
-    const armPivotR = findBone(/rightarm$/i);
-    const forearmPivotL = findBone(/leftforearm$/i);
-    const forearmPivotR = findBone(/rightforearm$/i);
-    const legPivotL = findBone(/leftupleg$/i);
-    const legPivotR = findBone(/rightupleg$/i);
-    const shinPivotL = findBone(/leftleg$/i);
-    const shinPivotR = findBone(/rightleg$/i);
-    const handL = findBone(/lefthand$/i);
-    const handR = findBone(/righthand$/i);
-    const footL = findBone(/leftfoot$/i);
-    const footR = findBone(/rightfoot$/i);
+    const initBone = (bone) => {
+        if (!bone) return null;
+        bone.userData.restingRot = bone.rotation.clone();
+        bone.userData.isAnimating = false;
+        bone.userData.animProgress = 0;
+        return bone;
+    };
 
-    // Posição de repouso (A-pose natural)
-    if (armPivotL) {
-        armPivotL.userData.restingRot = new THREE.Euler(0, 0, -1.25);
-        armPivotL.rotation.copy(armPivotL.userData.restingRot);
-        armPivotL.userData.isAnimating = false;
-        armPivotL.userData.animProgress = 0;
-    }
-    if (armPivotR) {
-        armPivotR.userData.restingRot = new THREE.Euler(0, 0, 1.25);
-        armPivotR.rotation.copy(armPivotR.userData.restingRot);
-        armPivotR.userData.isAnimating = false;
-        armPivotR.userData.animProgress = 0;
-    }
-    if (forearmPivotL) {
-        forearmPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
-        forearmPivotL.rotation.copy(forearmPivotL.userData.restingRot);
-        forearmPivotL.userData.isAnimating = false;
-        forearmPivotL.userData.animProgress = 0;
-    }
-    if (forearmPivotR) {
-        forearmPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
-        forearmPivotR.rotation.copy(forearmPivotR.userData.restingRot);
-        forearmPivotR.userData.isAnimating = false;
-        forearmPivotR.userData.animProgress = 0;
-    }
-    if (legPivotL) {
-        legPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
-        legPivotL.rotation.copy(legPivotL.userData.restingRot);
-        legPivotL.userData.isAnimating = false;
-        legPivotL.userData.animProgress = 0;
-    }
-    if (legPivotR) {
-        legPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
-        legPivotR.rotation.copy(legPivotR.userData.restingRot);
-        legPivotR.userData.isAnimating = false;
-        legPivotR.userData.animProgress = 0;
-    }
-    if (shinPivotL) {
-        shinPivotL.userData.restingRot = new THREE.Euler(0, 0, 0);
-        shinPivotL.rotation.copy(shinPivotL.userData.restingRot);
-        shinPivotL.userData.isAnimating = false;
-        shinPivotL.userData.animProgress = 0;
-    }
-    if (shinPivotR) {
-        shinPivotR.userData.restingRot = new THREE.Euler(0, 0, 0);
-        shinPivotR.rotation.copy(shinPivotR.userData.restingRot);
-        shinPivotR.userData.isAnimating = false;
-        shinPivotR.userData.animProgress = 0;
+    const armPivotL = initBone(findBone(/leftarm$/i));
+    const armPivotR = initBone(findBone(/rightarm$/i));
+    const forearmPivotL = initBone(findBone(/leftforearm$/i));
+    const forearmPivotR = initBone(findBone(/rightforearm$/i));
+    const legPivotL = initBone(findBone(/leftupleg$/i));
+    const legPivotR = initBone(findBone(/rightupleg$/i));
+    const shinPivotL = initBone(findBone(/leftleg$/i));
+    const shinPivotR = initBone(findBone(/rightleg$/i));
+    const handL = initBone(findBone(/lefthand$/i));
+    const handR = initBone(findBone(/righthand$/i));
+    const footL = initBone(findBone(/leftfoot$/i));
+    const footR = initBone(findBone(/rightfoot$/i));
+
+    // Suporte ao AnimationMixer para modelos GLB com animações embutidas (ex: Idle e Walk do Soldier)
+    let mixer = null;
+    let actions = {};
+    if (template.animations && template.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(clonedModel);
+        const idleClip = THREE.AnimationClip.findByName(template.animations, 'Idle') || template.animations[0];
+        if (idleClip) {
+            const idleAction = mixer.clipAction(idleClip);
+            idleAction.play();
+            actions.idle = idleAction;
+        }
+        const walkClip = THREE.AnimationClip.findByName(template.animations, 'Walk');
+        if (walkClip) {
+            const walkAction = mixer.clipAction(walkClip);
+            actions.walk = walkAction;
+        }
     }
 
     const dummyMesh = {
@@ -4558,7 +4534,7 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
         }
     };
 
-    return { group, parts, isMain, isGLB: true, id: Math.random().toString(36).substring(7) };
+    return { group, parts, isMain, isGLB: true, mixer, actions, id: Math.random().toString(36).substring(7) };
 }
 
 function updateAvatarModelUI() {
@@ -4960,6 +4936,19 @@ function animate3D() {
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
         avatar.group.rotation.y += diff * 0.15;
 
+        // Atualização do AnimationMixer (Idle/Walk suave e realista para modelos GLB)
+        if (avatar.mixer) {
+            if (avatar.actions && avatar.actions.walk && avatar.actions.idle) {
+                const walkWeight = Math.min(1.0, walkingIntensity * 1.6);
+                avatar.actions.walk.setEffectiveWeight(walkWeight);
+                avatar.actions.idle.setEffectiveWeight(1.0 - walkWeight);
+                if (walkWeight > 0.05 && !avatar.actions.walk.isRunning()) {
+                    avatar.actions.walk.play();
+                }
+            }
+            avatar.mixer.update(0.016);
+        }
+
         const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
         const baseHeight = avatar.isGLB ? 0.0 : 7.0;
         const walkLift = walkingIntensity * 0.2;
@@ -4992,15 +4981,17 @@ function animate3D() {
             const kneeBend = Math.max(0, Math.sin(phase + Math.PI / 2)) * 0.42 * walkingIntensity;
 
             if (avatar.isGLB) {
-                // ---- MODELO REALISTA (GLB) ----
-                if (!legPivot.userData.isAnimating) {
-                    legPivot.rotation.x += ((legPivot.userData.restingRot.x + (side === 'L' ? -swing : swing)) - legPivot.rotation.x) * 0.35;
-                }
-                if (!shinPivot.userData.isAnimating) {
-                    shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
-                }
-                if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
-                    armPivot.rotation.y += ((side === 'L' ? swing * 0.5 : -swing * 0.5) - armPivot.rotation.y) * 0.25;
+                // Se não houver AnimationMixer, aplica o balanço procedural mantendo o restingRot original
+                if (!avatar.mixer) {
+                    if (!legPivot.userData.isAnimating) {
+                        legPivot.rotation.x += ((legPivot.userData.restingRot.x + (side === 'L' ? -swing : swing)) - legPivot.rotation.x) * 0.35;
+                    }
+                    if (!shinPivot.userData.isAnimating) {
+                        shinPivot.rotation.x += ((shinPivot.userData.restingRot.x + kneeBend) - shinPivot.rotation.x) * 0.35;
+                    }
+                    if (!armPivot.userData.isAnimating && walkingIntensity > 0.01) {
+                        armPivot.rotation.y += ((armPivot.userData.restingRot.y + (side === 'L' ? swing * 0.5 : -swing * 0.5)) - armPivot.rotation.y) * 0.25;
+                    }
                 }
 
                 if (armPivot.userData.isAnimating) {
@@ -5019,7 +5010,7 @@ function animate3D() {
                             case 'Coxa':   targetY = -sign * 0.25; targetZ = armPivot.userData.restingRot.z + sign * 0.2; break;
                             default:       targetY = sign * 0.4;  targetZ = armPivot.userData.restingRot.z;
                         }
-                        armPivot.rotation.y = targetY * bounce;
+                        armPivot.rotation.y = armPivot.userData.restingRot.y + (targetY * bounce);
                         armPivot.rotation.z = armPivot.userData.restingRot.z + (targetZ - armPivot.userData.restingRot.z) * bounce;
                     }
                 }
