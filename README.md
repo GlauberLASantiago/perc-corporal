@@ -1,90 +1,68 @@
-# 👏 Percorporalizando — Sequenciador de Percussão Corporal
+# Percorporalizando
 
-Aplicativo web interativo para criação, visualização e ensino de **percussão corporal**. Voltado para educadores musicais e estudantes, permite montar sequências rítmicas com sons do próprio corpo (palmas, coxa, peito, pé e estalo) e visualizá-las em tempo real com um avatar 3D animado.
+**Sequenciador Interativo de Percussão Corporal com Visualização 3D e Partitura Dinâmica**
 
-## ✨ Funcionalidades
+O **Percorporalizando** é um aplicativo educacional interativo voltado para o aprendizado e prática de percussão corporal. Desenvolvido pelo professor **Glauber Santiago** (DAC/UFSCar), o projeto combina simulação tridimensional, síntese de áudio, geração de partitura dinâmica e ferramentas pedagógicas de aprendizado rítmico.
 
-- **Sequenciador visual** — timeline interativa com arrastar e soltar para posicionar cada batida
-- **Avatar 3D animado** — figura humana em Three.js que executa os movimentos sincronizados com o áudio
-- **Modo Turma** — exibe múltiplos avatares em fileiras ou roda, simulando uma turma em aula
-- **Biblioteca de 50+ padrões rítmicos** organizados em grupos:
-  - Fundamentos (semínimas e pulso)
-  - Divisões (colcheias e contratempo)
-  - Subdivisões e velocidade
-  - Células educativas Kodály/Orff
-  - Polirritmos e afrobrasileiros
-  - Estilos musicais (Baião, Samba, Funk, Frevo, etc.)
-- **Compassos suportados**: 3/4, 4/4 e 6/8
-- **Controle de BPM** com ajuste fino por botões ou campo numérico
-- **Metrônomo** e **modo loop** integrados
-- **Melodia acompanhante** opcional com escalas pentatônicas e outros modos
-- **Partitura rítmica** gerada automaticamente em SVG com símbolos de percussão corporal
-- **Glossário** de sons corporais com demonstração em áudio
-- **Exportar ritmos** — salva a sequência em formato JSON
-- **Exportar MIDI** — gera arquivo MIDI da sequência criada
-- **Gerar Certificado** — exporta uma imagem PNG com a partitura e os dados da sequência
-- **Atraso Bluetooth** — compensação de latência para uso com caixas ou fones sem fio
-- **Responsivo** — adaptado para desktop e dispositivos móveis
+---
 
-## 🛠️ Tecnologias
+## 🚀 Recursos Principais
 
-| Biblioteca | Uso |
-|---|---|
-| [Three.js r128](https://threejs.org/) | Renderização 3D do avatar e cena |
-| [WebAudioFont](https://surikov.github.io/webaudiofont/) | Síntese de sons de melodia |
-| [Soundfont Player](https://github.com/danigb/soundfont-player) | Player de fontes de áudio |
-| Web Audio API | Reprodução dos sons corporais (MP3) |
-| Canvas API | Geração do certificado PNG |
+### 1. Dois Modos de Sequenciador (Timeline)
+O sequenciador oferece duas formas de visualizar e editar os ritmos criados:
+*   **Vista Lateral (Lados ESQ/DIR)**:
+    *   A timeline exibe as raias de membros **Esquerdo (ESQ)** e **Direito (DIR)**, além das raias de **Deslocamento (DESL)** e **Giro (GIRO)** do corpo.
+    *   O usuário seleciona o som corporal no menu unificado (Pé, Coxa, Peito, Palma ou Estalo) e clica na célula da linha do tempo correspondente.
+    *   Permite a visualização completa da coreografia no palco 3D.
+*   **Vista Instrumental (Sons)**:
+    *   A timeline exibe raias individuais para cada som corporal: **Estalo (EST)**, **Peito (PEI)**, **Palma (PAL)**, **Coxa (COX)** e **Pé (PÉ)**.
+    *   Clicar sucessivamente em uma célula altera ciclicamente a lateralidade: **Esquerda (E)**, **Direita (D)**, **Ambos (E+D)** e **Vazio**.
+    *   Neste modo, a simulação 3D do avatar permanece estacionária na posição inicial para foco estrito na rítmica sonora.
 
-## 📁 Estrutura de Arquivos
+### 2. Partitura Corporal Dinâmica (SVG)
+Uma janela flutuante que desenha em tempo real a partitura rítmica correspondente aos sons preenchidos na timeline:
+*   Exibe raias paralelas para cada voz corporal, com figuras de notas e pausas equivalentes (semibreves, mínimas, semínimas, colcheias, etc.).
+*   Os símbolos adaptam-se automaticamente à fórmula de compasso selecionada (2/4, 3/4, 4/4 ou 6/8).
+*   Inclui um marcador visual (playhead) sincronizado com a execução do áudio para acompanhamento de leitura.
 
-```
-├── index.html          # Aplicativo completo (HTML + CSS + JS)
-├── padroes.js          # Biblioteca de 50+ padrões rítmicos
-├── palmas.mp3          # Som: palma
-├── peito.mp3           # Som: peito (centro)
-├── peito-d.mp3         # Som: peito direito
-├── peito-e.mp3         # Som: peito esquerdo
-├── coxa-d.mp3          # Som: coxa direita
-├── coxa-e.mp3          # Som: coxa esquerda
-├── pe-d.mp3            # Som: pé direito
-├── pe-e.mp3            # Som: pé esquerdo
-├── estalo-d.mp3        # Som: estalo (clique) direito
-├── estalo-e.mp3        # Som: estalo (clique) esquerdo
-└── musica-demo-90bpm.mp3  # Faixa de acompanhamento demo
-```
+### 3. Palco 3D Interativo
+*   Avatares tridimensionais (renderizados com Three.js) que realizam as animações correspondentes a cada golpe percussivo, giro e deslocamento na tela.
+*   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
+*   **Efeito Coletivo**: No modo turma, é aplicado um leve atraso espacial (delay e reverb) para emular o som acústico de um grupo de pessoas tocando em uma sala de aula.
 
-## 🚀 Como Usar
+### 4. Camada Melódica e Áudio
+*   **Melodia Pentatônica**: Gera uma melodia monofônica paralela para Marimba (escala pentatônica de Dó maior) baseada na rítmica corporal programada.
+*   **Timbres Ricos**: Suporte a WebAudioFont, Soundfont Player ou sintetizador interno como fallback.
+*   **Controles de Áudio**: Ajuste fino de BPM (tempo), metrônomo individual e slider de compensação de atraso visual (Atraso BT) para fones/caixas Bluetooth.
 
-Por ser uma aplicação web estática (HTML + JS + MP3), **não é necessário instalar nada**.
+### 5. Atalhos de Edição Rápida
+*   **Clique Cíclico**: Clicar na mesma célula preenchida avança ciclicamente para o próximo valor de som (Vista Lateral) ou de lateralidade (Vista Instrumental).
+*   **Clique Duplo**: Limpa a célula de forma instantânea.
+*   **Confirmação ao Limpar**: Evita exclusões acidentais com pop-up de confirmação ao acionar o botão "Limpar tudo".
 
-1. Clone ou baixe o repositório
-2. Abra o arquivo `index.html` diretamente no navegador
+### 6. Exportação e Compartilhamento
+*   **Salvar/Carregar (JSON)**: Exportação e importação de padrões rítmicos locais.
+*   **MIDI**: Exportação da melodia (canal 1) e da rítmica percussiva (canal 10) em arquivos `.mid`.
+*   **Certificado de Criação (PNG)**: Gera uma imagem de alta resolução com a partitura e os dados do aluno para envio rápido de tarefas escolares.
 
-> ⚠️ O navegador precisa suportar a **Web Audio API** (Chrome, Firefox, Edge, Safari modernos).
+---
 
-### Uso local com servidor
+## 🛠️ Tecnologias Utilizadas
 
-Para evitar restrições de CORS ao carregar os arquivos de áudio localmente, recomenda-se usar um servidor simples:
+*   **Estrutura**: HTML5 semântico
+*   **Estilo**: Vanilla CSS (layout responsivo e design escuro premium no palco 3D)
+*   **Gráficos 3D**: Three.js (com OrbitControls para manipulação da câmera)
+*   **Áudio**: Web Audio API (gerenciamento de buffers de áudio, panning estéreo, convolução de reverb e delay)
+*   **Melodia Pentatônica**: WebAudioFontPlayer e soundfont-player
+*   **Partitura**: Renderização dinâmica SVG baseada nas durações rítmicas
+*   **Ícones**: Emojis unicode nativos
 
-```bash
-# Python 3
-python -m http.server 8080
+---
 
-# Node.js (npx)
-npx serve .
-```
+## 📦 Como Usar
 
-Acesse `http://localhost:8080` no navegador.
-
-## 🎓 Uso em Aula
-
-1. Selecione um **padrão rítmico** da biblioteca ou monte o seu no sequenciador
-2. Ajuste o **BPM** conforme o nível da turma
-3. Ative o **Modo Turma** para visualizar os alunos em fileiras ou roda
-4. Use a **Partitura** para mostrar a notação rítmica equivalente
-5. Exporte o **Certificado** ao final da atividade
-
-## 📄 Licença
-
-Distribuído sem licença explícita. Entre em contato com o autor para uso comercial ou redistribuição.
+1.  Abra o arquivo `index.html` em qualquer navegador web moderno.
+2.  Clique em **🛠️ Abrir Sequenciador** na barra inferior para exibir a timeline.
+3.  Preencha as células com ritmos. Use o botão **🎛️ Vista** para alternar o layout da timeline e o botão **🎼 Abrir partitura** para visualizar a notação musical.
+4.  Clique em **▶ Play** para escutar e ver a simulação 3D em tempo real.
+5.  Use a seção **Aprender ritmos** para carregar exercícios rítmicos pré-configurados.
