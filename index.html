@@ -2990,29 +2990,37 @@ function initThreeJS() {
     controls.target.set(0, 20, 0); 
     controls.maxPolarAngle = Math.PI / 2 + 0.05; 
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45); 
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8); 
+    const hemiLight = new THREE.HemisphereLight(0xfff7ed, 0x223344, 0.4);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.85); 
     dirLight.position.set(50, 100, 50);
     dirLight.castShadow = true; 
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0xaabbff, 0.3); 
+    const fillLight = new THREE.DirectionalLight(0x99bbff, 0.35); 
     fillLight.position.set(-50, 50, -50);
     scene.add(fillLight);
 
+    // Rim / Backlight suave para realçar a silhueta 3D e contorno dos personagens
+    const rimLight = new THREE.DirectionalLight(0xffecd0, 0.65);
+    rimLight.position.set(0, 80, -90);
+    scene.add(rimLight);
+
     const floorGeometry = new THREE.PlaneGeometry(500, 500); 
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2e15, roughness: 0.6, metalness: 0.1 }); 
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x3d271d, roughness: 0.45, metalness: 0.1 }); 
     const floorPlane = new THREE.Mesh(floorGeometry, floorMaterial);
     floorPlane.rotation.x = -Math.PI / 2; 
     floorPlane.receiveShadow = true; 
     scene.add(floorPlane);
 
     const gridHelper = new THREE.GridHelper(500, 50, 0x000000, 0x000000); 
-    gridHelper.material.opacity = 0.15; 
+    gridHelper.material.opacity = 0.12; 
     gridHelper.material.transparent = true;
     gridHelper.position.y = 0.1; 
     scene.add(gridHelper);
@@ -3029,23 +3037,13 @@ function initThreeJS() {
 }
 
 /**
- * createSingleAvatar — cada perna agora tem:
- *   legPivot (ancoragem no quadril)
- *     └── thighMesh  (coxa — parte superior, comprimento 12)
- *     └── shinPivot  (pivot no joelho, posição y = -12 relativo ao legPivot)
- *           └── shinMesh  (canela — comprimento 11)
- *           └── footMesh  (pé — posição y = -11 relativo ao shinPivot)
- *
- * parts[side].meshes:
- *   'Coxa'  → thighMesh   (iluminado apenas no hit de Coxa)
- *   'Pé'    → footMesh    (iluminado no hit de Pé)
- *   'Palma' → handMesh
- *   'Estalo'→ handMesh
- *   'Peito' → chestMesh
+ * createSingleAvatar — Modelo 3D estilizado com proporções anatômicas refinadas,
+ * cabeça expressiva, olhos vivos com catchlight, mãos modeladas, peitorais orgânicos
+ * e tênis modernos esportivos (sneakers).
  */
 function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex) {
     const group = new THREE.Group();
-    // Elevado 7 unidades para que o pé (base em y≈-5 local) fique rente ao chão
+    // Elevado 7 unidades para que a sola do tênis fique rente ao palco
     group.position.set(x, 7, z);
     group.userData.baseX = x;
     group.userData.baseZ = z;
@@ -3063,10 +3061,12 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
     };
 
-    const matSkin  = new THREE.MeshStandardMaterial({ color: skinHex,  roughness: 0.5 });
-    const matShirt = new THREE.MeshStandardMaterial({ color: shirtHex, roughness: 0.8 });
-    const matPants = new THREE.MeshStandardMaterial({ color: pantsHex, roughness: 0.9 });
-    const matShoes = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+    const matSkin   = new THREE.MeshStandardMaterial({ color: skinHex,  roughness: 0.55, metalness: 0.05 });
+    const matShirt  = new THREE.MeshStandardMaterial({ color: shirtHex, roughness: 0.82, metalness: 0.02 });
+    const matPants  = new THREE.MeshStandardMaterial({ color: pantsHex, roughness: 0.88, metalness: 0.02 });
+    const matShoes  = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6, metalness: 0.1 });
+    const matSole   = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.7, metalness: 0.05 });
+    const matAccent = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.1 });
 
     const setupGlowAndShadow = (mesh) => {
         mesh.castShadow = true;
@@ -3076,210 +3076,269 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         mesh.userData.isAnimating = false;
     };
 
-    // Determinar cor do cabelo estilizada baseada na pele/aleatória
-    let hairColor = 0x221108; // Castanho escuro padrão
+    // Cores de cabelo estilizadas
+    let hairColor = 0x1f1610; 
     if (skinHex === 0xffccaa || skinHex === 0xffbfa3) {
-        const choices = [0x221108, 0x0c0908, 0x4a3728, 0xd4a373];
+        const choices = [0x221208, 0x150f0b, 0x5a3e28, 0xb8864e, 0x1b1918];
         hairColor = choices[Math.floor(Math.random() * choices.length)];
-    } else if (skinHex === 0x8d5524 || skinHex === 0x4d2a22) {
-        const choices = [0x090706, 0x1a0f0a];
+    } else if (skinHex === 0x8d5524 || skinHex === 0x4d2a22 || skinHex === 0xc68642) {
+        const choices = [0x0c0908, 0x1a120c, 0x241810];
         hairColor = choices[Math.floor(Math.random() * choices.length)];
     } else {
-        const choices = [0x0c0908, 0x221108, 0x3d2314];
+        const choices = [0x120d09, 0x22150d, 0x3d2616];
         hairColor = choices[Math.floor(Math.random() * choices.length)];
     }
 
-    const matHair  = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85 });
-    const matEyeW  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
-    const matEyeP  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 });
-    const matMouth = new THREE.MeshStandardMaterial({ color: 0x9e2a2b, roughness: 0.6 });
+    const matHair     = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0.05 });
+    const matEyeWhite = new THREE.MeshStandardMaterial({ color: 0xfdfdfd, roughness: 0.2 });
+    const irisColors  = [0x3d271d, 0x241711, 0x2c4a3e, 0x2a3e52];
+    const irisHex     = irisColors[Math.floor(Math.random() * irisColors.length)];
+    const matIris     = new THREE.MeshStandardMaterial({ color: irisHex, roughness: 0.3 });
+    const matPupil    = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1 });
+    const matCatch    = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const matLips     = new THREE.MeshStandardMaterial({ color: 0xa84344, roughness: 0.6 });
 
-    // Cabeça (elevada ligeiramente para dar espaço ao pescoço)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(5.8, 32, 32), matSkin);
-    head.position.set(0, 38, 0); 
+    // ==========================================
+    // CABEÇA ESTILIZADA ANATÔMICA (y = 38)
+    // ==========================================
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 38, 0);
+
+    // Crânio principal com formato sutilmente afilado
+    const headGeo = new THREE.SphereGeometry(5.6, 32, 28);
+    const head = new THREE.Mesh(headGeo, matSkin);
+    head.scale.set(0.97, 1.08, 1.02);
     head.castShadow = true;
-    group.add(head);
+    headGroup.add(head);
 
-    // Olhos (esclera + pupila)
-    const eyeWhiteGeo = new THREE.SphereGeometry(0.7, 16, 16);
-    const pupilGeo = new THREE.SphereGeometry(0.4, 16, 16);
+    // Queixo e mandíbula para formato harmônico
+    const jawGeo = new THREE.SphereGeometry(3.0, 20, 16);
+    const jaw = new THREE.Mesh(jawGeo, matSkin);
+    jaw.position.set(0, -3.2, 1.8);
+    jaw.scale.set(0.9, 0.7, 1.1);
+    headGroup.add(jaw);
 
-    // Olho Esquerdo
-    const eyeWhiteL = new THREE.Mesh(eyeWhiteGeo, matEyeW);
-    eyeWhiteL.position.set(-1.8, 0.8, 5.0);
-    head.add(eyeWhiteL);
+    // Olhos expressivos com catchlight
+    [-1, 1].forEach(eyeSign => {
+        const eyeX = eyeSign * 1.8;
+        const eyeY = 0.7;
+        const eyeZ = 4.8;
 
-    const pupilL = new THREE.Mesh(pupilGeo, matEyeP);
-    pupilL.position.set(-1.8, 0.8, 5.5);
-    head.add(pupilL);
+        const scleraGeo = new THREE.SphereGeometry(0.85, 20, 20);
+        const sclera = new THREE.Mesh(scleraGeo, matEyeWhite);
+        sclera.position.set(eyeX, eyeY, eyeZ);
+        sclera.scale.set(1.05, 0.9, 0.55);
+        headGroup.add(sclera);
 
-    // Olho Direito
-    const eyeWhiteR = new THREE.Mesh(eyeWhiteGeo, matEyeW);
-    eyeWhiteR.position.set(1.8, 0.8, 5.0);
-    head.add(eyeWhiteR);
+        const irisGeo = new THREE.CircleGeometry(0.48, 18);
+        const iris = new THREE.Mesh(irisGeo, matIris);
+        iris.position.set(eyeX, eyeY, eyeZ + 0.46);
+        headGroup.add(iris);
 
-    const pupilR = new THREE.Mesh(pupilGeo, matEyeP);
-    pupilR.position.set(1.8, 0.8, 5.5);
-    head.add(pupilR);
+        const pupilGeo = new THREE.CircleGeometry(0.28, 18);
+        const pupil = new THREE.Mesh(pupilGeo, matPupil);
+        pupil.position.set(eyeX, eyeY, eyeZ + 0.47);
+        headGroup.add(pupil);
 
-    // Sobrancelhas
-    const browGeo = new THREE.BoxGeometry(1.6, 0.25, 0.3);
-    const browL = new THREE.Mesh(browGeo, matHair);
-    browL.position.set(-1.8, 2.0, 5.1);
-    browL.rotation.z = -0.08;
-    head.add(browL);
+        const catchGeo = new THREE.CircleGeometry(0.1, 12);
+        const catchlight = new THREE.Mesh(catchGeo, matCatch);
+        catchlight.position.set(eyeX + 0.12, eyeY + 0.12, eyeZ + 0.48);
+        headGroup.add(catchlight);
 
-    const browR = new THREE.Mesh(browGeo, matHair);
-    browR.position.set(1.8, 2.0, 5.1);
-    browR.rotation.z = 0.08;
-    head.add(browR);
+        const lidGeo = new THREE.BoxGeometry(1.9, 0.22, 0.6);
+        const lid = new THREE.Mesh(lidGeo, matSkin);
+        lid.position.set(eyeX, eyeY + 0.7, eyeZ + 0.2);
+        headGroup.add(lid);
 
-    // Nariz
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 1.0), matSkin);
-    nose.position.set(0, -0.6, 5.6);
-    head.add(nose);
+        const browGeo = new THREE.BoxGeometry(1.8, 0.35, 0.5);
+        const brow = new THREE.Mesh(browGeo, matHair);
+        brow.position.set(eyeX, eyeY + 1.6, eyeZ + 0.25);
+        brow.rotation.z = -eyeSign * 0.1;
+        headGroup.add(brow);
 
-    // Boca (um pequeno sorriso amigável e sutil)
-    const mouthGeo = new THREE.TorusGeometry(1.2, 0.15, 8, 16, Math.PI * 0.5);
-    const mouth = new THREE.Mesh(mouthGeo, matMouth);
-    mouth.position.set(0, -2.2, 4.4);
-    mouth.rotation.set(-0.39, 0, -Math.PI * 0.75);
-    head.add(mouth);
+        const earOuterGeo = new THREE.SphereGeometry(1.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const earOuter = new THREE.Mesh(earOuterGeo, matSkin);
+        earOuter.position.set(eyeSign * 5.6, 0.2, -0.2);
+        earOuter.rotation.z = eyeSign * (Math.PI / 2);
+        earOuter.scale.set(0.7, 1.2, 0.9);
+        headGroup.add(earOuter);
 
-    // Orelhas
-    const earGeo = new THREE.SphereGeometry(1.1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    
-    const earL = new THREE.Mesh(earGeo, matSkin);
-    earL.position.set(-5.8, 0, 0);
-    earL.rotation.z = Math.PI / 2;
-    head.add(earL);
+        const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), new THREE.MeshStandardMaterial({ color: 0x8a4530, roughness: 0.8 }));
+        earInner.position.set(eyeSign * 5.75, 0.2, -0.15);
+        earInner.scale.set(0.4, 0.8, 0.6);
+        headGroup.add(earInner);
+    });
 
-    const earR = new THREE.Mesh(earGeo, matSkin);
-    earR.position.set(5.8, 0, 0);
-    earR.rotation.z = -Math.PI / 2;
-    head.add(earR);
+    // Nariz com ponte e ponta arredondada
+    const noseBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 1.8, 12), matSkin);
+    noseBridge.position.set(0, 0.1, 5.35);
+    noseBridge.rotation.x = -0.18;
+    headGroup.add(noseBridge);
 
-    // Cabelo
-    const hairTop = new THREE.Mesh(new THREE.SphereGeometry(6.1, 32, 16), matHair);
-    hairTop.position.set(0, 1.0, -0.8);
-    head.add(hairTop);
+    const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.65, 16, 16), matSkin);
+    noseTip.position.set(0, -0.7, 5.65);
+    noseTip.scale.set(1.1, 0.8, 1.0);
+    headGroup.add(noseTip);
 
-    const bangs = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.0, 3.2), matHair);
-    bangs.position.set(0, 3.8, 3.4);
-    bangs.rotation.x = -0.25;
-    head.add(bangs);
+    // Boca amigável
+    const mouthGeo = new THREE.TorusGeometry(1.15, 0.18, 10, 20, Math.PI * 0.55);
+    const mouth = new THREE.Mesh(mouthGeo, matLips);
+    mouth.position.set(0, -2.1, 4.8);
+    mouth.rotation.set(-0.35, 0, -Math.PI * 0.77);
+    headGroup.add(mouth);
 
-    const sideburnsL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.5, 1.8), matHair);
-    sideburnsL.position.set(-5.8, -0.5, 1.2);
-    head.add(sideburnsL);
+    // Volume e estilo do cabelo
+    const hairBase = new THREE.Mesh(new THREE.SphereGeometry(5.95, 32, 20), matHair);
+    hairBase.position.set(0, 1.2, -0.7);
+    hairBase.scale.set(0.99, 1.06, 1.05);
+    headGroup.add(hairBase);
 
-    const sideburnsR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.5, 1.8), matHair);
-    sideburnsR.position.set(5.8, -0.5, 1.2);
-    head.add(sideburnsR);
+    // Topete estilizado em mechas anguladas
+    const quiffGeo = new THREE.BoxGeometry(6.6, 2.6, 4.4);
+    const quiff = new THREE.Mesh(quiffGeo, matHair);
+    quiff.position.set(0, 4.8, 2.4);
+    quiff.rotation.x = -0.32;
+    headGroup.add(quiff);
 
-    // Pescoço
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.4, 4.5, 16), matSkin);
+    const quiffFront = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.6, 2.2), matHair);
+    quiffFront.position.set(0, 4.2, 4.2);
+    quiffFront.rotation.x = -0.45;
+    headGroup.add(quiffFront);
+
+    [-1, 1].forEach(sideSign => {
+        const sideburn = new THREE.Mesh(new THREE.BoxGeometry(0.7, 3.2, 1.8), matHair);
+        sideburn.position.set(sideSign * 5.65, -0.6, 1.2);
+        headGroup.add(sideburn);
+    });
+
+    group.add(headGroup);
+
+    // ==========================================
+    // PESCOÇO E TRAPÉZIO
+    // ==========================================
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.4, 4.6, 18), matSkin);
     neck.position.set(0, 32.5, 0);
     neck.castShadow = true;
     neck.receiveShadow = true;
     group.add(neck);
 
-    // Torso (comprimento 16, posicionado em y=26)
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(7, 6, 16, 16), matShirt);
-    torso.position.set(0, 26, 0);
-    torso.castShadow = true;
-    group.add(torso);
+    const trapezius = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 4.8, 2.0, 18), matSkin);
+    trapezius.position.set(0, 31.0, 0);
+    group.add(trapezius);
 
-    // Gola da camisa
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.0, 1.0, 16), matShirt);
-    collar.position.set(0, 34.1, 0);
+    // Gola da camiseta
+    const collarGeo = new THREE.TorusGeometry(2.7, 0.45, 12, 24);
+    const collar = new THREE.Mesh(collarGeo, matShirt);
+    collar.position.set(0, 33.6, 0);
+    collar.rotation.x = Math.PI / 2;
     collar.castShadow = true;
     group.add(collar);
 
-    // Botões na camisa
-    const matButtons = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4 });
-    const buttonGeo = new THREE.SphereGeometry(0.35, 8, 8);
-    for (let i = 0; i < 3; i++) {
-        const btnY = 31.0 - i * 4.0;
-        const radiusAtY = 6.0 + (btnY - 18.0) / 16.0;
-        const btn = new THREE.Mesh(buttonGeo, matButtons);
-        btn.position.set(0, btnY, radiusAtY + 0.1);
-        group.add(btn);
-    }
+    // ==========================================
+    // TORSO ANATÔMICO (Tórax atlético + Cintura)
+    // ==========================================
+    const chestTorsoGeo = new THREE.CylinderGeometry(6.6, 5.6, 8.5, 20);
+    const chestTorso = new THREE.Mesh(chestTorsoGeo, matShirt);
+    chestTorso.position.set(0, 29.5, 0);
+    chestTorso.scale.set(1.05, 1.0, 0.88);
+    chestTorso.castShadow = true;
+    group.add(chestTorso);
 
-    // Cinto
-    const belt = new THREE.Mesh(new THREE.CylinderGeometry(6.1, 6.1, 1.2, 16), new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.7 }));
-    belt.position.set(0, 18.0, 0);
-    belt.castShadow = true;
-    group.add(belt);
+    const waistGeo = new THREE.CylinderGeometry(5.4, 5.8, 7.5, 20);
+    const waist = new THREE.Mesh(waistGeo, matShirt);
+    waist.position.set(0, 22.0, 0);
+    waist.scale.set(1.02, 1.0, 0.85);
+    waist.castShadow = true;
+    group.add(waist);
 
-    // Fivela do Cinto
-    const buckle = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 0.4), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.2 }));
-    buckle.position.set(0, 18.0, 6.2);
-    buckle.castShadow = true;
-    group.add(buckle);
-
-    // Peito — geometria clonada para cada lado (independência de animação)
-    const chestL = new THREE.Mesh(new THREE.BoxGeometry(6, 8, 8), matShirt.clone());
-    chestL.position.set(-4, 28, 2);
+    // Peitorais anatômicos integrados (iluminam no golpe de Peito)
+    const peitoralGeoL = new THREE.SphereGeometry(3.6, 20, 16);
+    peitoralGeoL.scale(1.05, 0.9, 0.55);
+    const chestL = new THREE.Mesh(peitoralGeoL, matShirt.clone());
+    chestL.position.set(-3.2, 28.5, 3.0);
     setupGlowAndShadow(chestL);
     group.add(chestL);
     parts.L.meshes['Peito'] = chestL;
 
-    const chestR = new THREE.Mesh(new THREE.BoxGeometry(6, 8, 8), matShirt.clone());
-    chestR.position.set(4, 28, 2);
+    const peitoralGeoR = new THREE.SphereGeometry(3.6, 20, 16);
+    peitoralGeoR.scale(1.05, 0.9, 0.55);
+    const chestR = new THREE.Mesh(peitoralGeoR, matShirt.clone());
+    chestR.position.set(3.2, 28.5, 3.0);
     setupGlowAndShadow(chestR);
     group.add(chestR);
     parts.R.meshes['Peito'] = chestR;
 
-    // Geometrias reutilizáveis
+    // Cinto e Fivela
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(6.0, 6.0, 1.3, 20), new THREE.MeshStandardMaterial({ color: 0x221a15, roughness: 0.6 }));
+    belt.position.set(0, 18.0, 0);
+    belt.scale.set(1.03, 1.0, 0.88);
+    belt.castShadow = true;
+    group.add(belt);
 
-    // --- Coxa: comprimento 12 (pivot no topo, cresce para baixo) ---
-    const thighGeo = new THREE.CylinderGeometry(3.5, 3.0, 12, 16);
-    thighGeo.translate(0, -6, 0);   // pivot no topo
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.5, 0.4), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.25 }));
+    buckle.position.set(0, 18.0, 5.5);
+    buckle.castShadow = true;
+    group.add(buckle);
 
-    // --- Canela: comprimento 11 ---
-    const shinGeo = new THREE.CylinderGeometry(2.5, 2.0, 11, 16);
-    shinGeo.translate(0, -5.5, 0);  // pivot no topo (joelho)
+    // Bacia / Quadril
+    const pelvisGeo = new THREE.CylinderGeometry(5.8, 5.0, 3.0, 20);
+    const pelvis = new THREE.Mesh(pelvisGeo, matPants);
+    pelvis.position.set(0, 16.5, 0);
+    pelvis.scale.set(1.02, 1.0, 0.85);
+    pelvis.castShadow = true;
+    group.add(pelvis);
 
-    const footGeo = new THREE.BoxGeometry(4.5, 3, 9);
-    const soleGeo = new THREE.BoxGeometry(4.7, 0.8, 9.2);
-    const matSole = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.8 });
+    // ==========================================
+    // GEOMETRIAS ANATÔMICAS DAS PERNAS
+    // ==========================================
+    const thighGeo = new THREE.CylinderGeometry(3.2, 2.7, 12, 18);
+    thighGeo.translate(0, -6, 0);
 
+    const shinGeo = new THREE.CylinderGeometry(2.6, 2.0, 11, 18);
+    shinGeo.translate(0, -5.5, 0);
+
+    // ==========================================
+    // BRAÇOS E PERNAS (L e R)
+    // ==========================================
     ['L', 'R'].forEach(side => {
         const isLeft = side === 'L';
         const sign   = isLeft ? -1 : 1;
 
-        // ---- BRAÇO ----
+        // ---- BRAÇO (Ombro) ----
         const armPivot = new THREE.Group();
         armPivot.position.set(sign * 9, 33, 0); 
-        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.2); 
+        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18); 
         armPivot.rotation.copy(armPivot.userData.restingRot);
         armPivot.userData.isAnimating = false;
         armPivot.userData.animProgress = 0;
         
-        // Articulação do ombro (esfera da cor da camisa)
-        const shoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(2.3, 16, 16), matShirt.clone());
+        // Deltóide
+        const shoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(2.4, 18, 18), matShirt.clone());
         shoulderMesh.castShadow = true;
         armPivot.add(shoulderMesh);
 
-        // Manga da camisa (comprimento 5.0)
-        const sleeveGeo = new THREE.CylinderGeometry(2.2, 2.0, 5.0, 16);
-        sleeveGeo.translate(0, -2.5, 0);
+        // Manga da camisa
+        const sleeveGeo = new THREE.CylinderGeometry(2.35, 2.1, 4.8, 18);
+        sleeveGeo.translate(0, -2.4, 0);
         const sleeveMesh = new THREE.Mesh(sleeveGeo, matShirt.clone());
         sleeveMesh.castShadow = true;
         armPivot.add(sleeveMesh);
 
-        // Parte superior do braço (pele, comprimento 3.0)
-        const upperArmSkinGeo = new THREE.CylinderGeometry(2.0, 1.8, 3.0, 16);
-        upperArmSkinGeo.translate(0, -1.5, 0);
+        const sleeveHem = new THREE.Mesh(new THREE.TorusGeometry(2.15, 0.2, 10, 20), matShirt.clone());
+        sleeveHem.position.set(0, -4.7, 0);
+        sleeveHem.rotation.x = Math.PI / 2;
+        armPivot.add(sleeveHem);
+
+        // Braço superior em tom de pele
+        const upperArmSkinGeo = new THREE.CylinderGeometry(1.95, 1.7, 3.2, 18);
+        upperArmSkinGeo.translate(0, -1.6, 0);
         const upperArmSkinMesh = new THREE.Mesh(upperArmSkinGeo, matSkin.clone());
-        upperArmSkinMesh.position.y = -5.0;
+        upperArmSkinMesh.position.y = -4.8;
         upperArmSkinMesh.castShadow = true;
         upperArmSkinMesh.receiveShadow = true;
         armPivot.add(upperArmSkinMesh);
 
-        // ---- ANTEBRAÇO ----
+        // ---- ANTEBRAÇO (Cotovelo) ----
         const forearmPivot = new THREE.Group();
         forearmPivot.position.set(0, -8.0, 0);
         forearmPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
@@ -3287,60 +3346,71 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         forearmPivot.userData.isAnimating = false;
         forearmPivot.userData.animProgress = 0;
 
-        // Articulação do cotovelo (pele)
-        const elbowMesh = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 16), matSkin.clone());
+        const elbowMesh = new THREE.Mesh(new THREE.SphereGeometry(1.65, 16, 16), matSkin.clone());
         elbowMesh.castShadow = true;
         elbowMesh.receiveShadow = true;
         forearmPivot.add(elbowMesh);
 
-        // Antebraço (pele, comprimento 7.0)
-        const forearmGeo = new THREE.CylinderGeometry(1.7, 1.4, 7.0, 16);
+        const forearmGeo = new THREE.CylinderGeometry(1.65, 1.35, 7.0, 18);
         forearmGeo.translate(0, -3.5, 0);
         const forearmMesh = new THREE.Mesh(forearmGeo, matSkin.clone());
         forearmMesh.castShadow = true;
         forearmMesh.receiveShadow = true;
         forearmPivot.add(forearmMesh);
 
+        const wristMesh = new THREE.Mesh(new THREE.SphereGeometry(1.3, 14, 14), matSkin.clone());
+        wristMesh.position.set(0, -7.0, 0);
+        forearmPivot.add(wristMesh);
+
+        // ---- MÃOS ANATÔMICAS ----
         const handMat = matSkin.clone();
         
-        // Palma da mão
-        const palmGeo = new THREE.BoxGeometry(3.2, 4.0, 1.2);
-        palmGeo.translate(0, -2.0, 0); // Pivô no pulso
+        const palmGeo = new THREE.BoxGeometry(2.9, 3.7, 1.1);
+        palmGeo.translate(0, -1.85, 0);
         
         const handMesh = new THREE.Mesh(palmGeo, handMat);
-        handMesh.position.set(0, -7.0, 0); // Fica na extremidade do antebraço (y = -7)
+        handMesh.position.set(0, -7.0, 0);
         setupGlowAndShadow(handMesh);
         
-        const thumbGeo = new THREE.BoxGeometry(0.75, 1.8, 0.75);
-        thumbGeo.translate(0, -0.9, 0); // Pivô na base do polegar
-        const thumbMesh = new THREE.Mesh(thumbGeo, handMat);
-        // O polegar fica na lateral interna da mão (direção de -sign)
-        thumbMesh.position.set(-sign * 1.6, -1.8, -0.25);
-        thumbMesh.rotation.z = sign * 0.45; // Angulado para dentro (direção medial)
-        thumbMesh.rotation.x = 0.3;         // Angulado levemente para trás (palma para trás)
-        thumbMesh.castShadow = true;
-        thumbMesh.receiveShadow = true;
-        handMesh.add(thumbMesh);
+        // Músculo tenar
+        const tenarMesh = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), handMat);
+        tenarMesh.position.set(-sign * 1.3, -1.2, 0.2);
+        tenarMesh.scale.set(0.8, 1.2, 0.9);
+        handMesh.add(tenarMesh);
 
-        // Dedos (Indicador, Médio, Anelar, Mínimo)
-        const fingerWidth = 0.6;
-        const fingerThick = 0.6;
-        const fingerSpacing = 0.7;
-        const fingerLengths = [2.2, 2.5, 2.3, 1.8]; // Proporções realistas dos dedos
+        // Polegar articulado
+        const thumbBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 1.5, 12), handMat);
+        thumbBase.position.set(-sign * 1.5, -1.8, 0.2);
+        thumbBase.rotation.z = sign * 0.42;
+        thumbBase.rotation.x = 0.35;
+        thumbBase.castShadow = true;
+        handMesh.add(thumbBase);
+
+        const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 12), handMat);
+        thumbTip.position.set(0, -0.75, 0);
+        thumbBase.add(thumbTip);
+
+        // Dedos naturais com leve flexão relaxada
+        const fingerSpacing = 0.68;
+        const fingerLengths = [2.2, 2.5, 2.3, 1.75]; 
         
         for (let i = 0; i < 4; i++) {
             const length = fingerLengths[i];
-            const fingerGeo = new THREE.BoxGeometry(fingerWidth, length, fingerThick);
-            fingerGeo.translate(0, -length / 2, 0); // Pivô na base do dedo
+            const fingerGeo = new THREE.CylinderGeometry(0.32, 0.38, length, 12);
+            fingerGeo.translate(0, -length / 2, 0);
             
             const fingerMesh = new THREE.Mesh(fingerGeo, handMat);
-            // X-position: do indicador (mais interno, -sign) ao mínimo (mais externo, sign)
             const xOffset = (-1.5 + i) * fingerSpacing;
             const fingerX = sign * xOffset;
             
-            fingerMesh.position.set(fingerX, -4.0, 0);
+            fingerMesh.position.set(fingerX, -3.7, 0);
+            fingerMesh.rotation.x = 0.15; 
             fingerMesh.castShadow = true;
-            fingerMesh.receiveShadow = true;
+            
+            const tipMesh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), handMat);
+            tipMesh.position.set(0, -length, 0);
+            fingerMesh.add(tipMesh);
+
             handMesh.add(fingerMesh);
         }
         
@@ -3353,20 +3423,24 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         parts[side].meshes['Palma']  = handMesh;
         parts[side].meshes['Estalo'] = handMesh; 
 
-        // ---- PERNA: pivot no quadril (y=18 = base do torso) ----
+        // ---- PERNA (Quadril) ----
         const legPivot = new THREE.Group();
-        legPivot.position.set(sign * 4, 18, 0);
+        legPivot.position.set(sign * 3.8, 18, 0);
         legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
         legPivot.rotation.copy(legPivot.userData.restingRot);
         legPivot.userData.isAnimating  = false;
         legPivot.userData.animProgress = 0;
 
-        // Coxa mesh (parte superior)
         const thighMesh = new THREE.Mesh(thighGeo, matPants.clone());
         setupGlowAndShadow(thighMesh);
         legPivot.add(thighMesh);
 
-        // Pivot do joelho: y = -12 (base da coxa)
+        const kneeMesh = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 16), matPants.clone());
+        kneeMesh.position.set(0, -12, 0.2);
+        kneeMesh.castShadow = true;
+        legPivot.add(kneeMesh);
+
+        // ShinPivot no joelho
         const shinPivot = new THREE.Group();
         shinPivot.position.set(0, -12, 0);
         shinPivot.userData.restingRot  = new THREE.Euler(0, 0, 0);
@@ -3374,34 +3448,61 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
         shinPivot.userData.isAnimating  = false;
         shinPivot.userData.animProgress = 0;
 
-        // Canela mesh
         const shinMesh = new THREE.Mesh(shinGeo, matPants.clone());
         setupGlowAndShadow(shinMesh);
         shinPivot.add(shinMesh);
 
-        // Pé mesh — projetado para frente (z=4) para aparecer abaixo/na frente da canela
-        const footMesh = new THREE.Mesh(footGeo, matShoes.clone());
-        footMesh.position.set(0, -11, 4); 
+        // ---- SNEAKERS URBANOS ----
+        const sneakerGroup = new THREE.Group();
+        sneakerGroup.position.set(0, -11, 3.8);
+
+        const shoeBodyGeo = new THREE.BoxGeometry(4.2, 2.8, 8.6);
+        const footMesh = new THREE.Mesh(shoeBodyGeo, matShoes.clone());
+        footMesh.position.set(0, 0, 0);
         setupGlowAndShadow(footMesh);
-        
-        // Adicionar sola branca e cadarços para parecer um tênis esportivo real
+        sneakerGroup.add(footMesh);
+
+        const toeGeo = new THREE.SphereGeometry(2.1, 16, 14);
+        const toeMesh = new THREE.Mesh(toeGeo, matShoes.clone());
+        toeMesh.position.set(0, -0.1, 4.0);
+        toeMesh.scale.set(0.98, 0.65, 0.85);
+        footMesh.add(toeMesh);
+
+        const soleGeo = new THREE.BoxGeometry(4.5, 0.9, 9.2);
         const soleMesh = new THREE.Mesh(soleGeo, matSole);
-        soleMesh.position.set(0, -1.2, 0);
+        soleMesh.position.set(0, -1.35, 0.2);
         footMesh.add(soleMesh);
 
-        const lacesMesh = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.4, 3.5), matSole);
-        lacesMesh.position.set(0, 1.6, 1.0);
-        footMesh.add(lacesMesh);
+        const soleFront = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.9, 16, 1, false, 0, Math.PI), matSole);
+        soleFront.position.set(0, -1.35, 4.6);
+        soleFront.rotation.y = Math.PI;
+        footMesh.add(soleFront);
 
-        shinPivot.add(footMesh);
+        // Faixa esportiva lateral
+        const stripeL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 5.0), matAccent);
+        stripeL.position.set(-2.15, 0.1, 0.2);
+        stripeL.rotation.z = -0.1;
+        footMesh.add(stripeL);
 
+        const stripeR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 5.0), matAccent);
+        stripeR.position.set(2.15, 0.1, 0.2);
+        stripeR.rotation.z = 0.1;
+        footMesh.add(stripeR);
+
+        // Cadarços esportivos
+        for (let l = 0; l < 3; l++) {
+            const lace = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 0.6), matSole);
+            lace.position.set(0, 1.45, 0.6 + l * 1.1);
+            footMesh.add(lace);
+        }
+
+        shinPivot.add(sneakerGroup);
         legPivot.add(shinPivot);
         group.add(legPivot);
 
         parts[side].legPivot  = legPivot;
         parts[side].shinPivot = shinPivot;
 
-        // Mapeamento de meshes para iluminação:
         parts[side].meshes['Coxa'] = thighMesh;
         parts[side].meshes['Pé']   = footMesh;
     });
@@ -3412,7 +3513,7 @@ function createSingleAvatar(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHe
 function initAvatars() {
     allAvatars = [];
     
-    const mainAvatar = createSingleAvatar(true, 0, 0, 1.0, 0xffccaa, 0x34495e, 0x2c3e50);
+    const mainAvatar = createSingleAvatar(true, 0, 0, 1.0, 0xffccaa, 0x2c3e50, 0x1d2d44);
     mainAvatar.group.userData.fileBaseX = 0;
     mainAvatar.group.userData.fileBaseZ = 0;
     mainAvatar.group.userData.fileBaseRotY = 0;
@@ -3420,7 +3521,8 @@ function initAvatars() {
     scene.add(mainAvatar.group);
 
     const skinColors   = [0xffccaa, 0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x4d2a22, 0xffbfa3];
-    const clothesColors = [0xe74c3c, 0x2ecc71, 0x9b59b6, 0xf1c40f, 0xe67e22, 0x1abc9c, 0x3498db, 0x95a5a6, 0xd35400, 0x27ae60];
+    const shirtColors  = [0x2c3e50, 0x9b2226, 0x005f73, 0x0a9396, 0xca6702, 0xbb3e03, 0x4a4e69, 0x2a9d8f, 0xe76f51, 0x3d5a80];
+    const pantsColors  = [0x1d2d44, 0x1f2421, 0x2b2d42, 0x353b48, 0x273c75, 0x3d3d3d, 0x4b4b4b];
 
     // Opção 1: turma em fileiras, com espaçamento fixo para evitar colisões.
     const formationRows = [
@@ -3438,8 +3540,8 @@ function initAvatars() {
             const z = row.z;
             const scale = row.scaleBase + (Math.random() * 0.08 - 0.04);
             const skin  = skinColors[Math.floor(Math.random() * skinColors.length)];
-            const shirt = clothesColors[Math.floor(Math.random() * clothesColors.length)];
-            const pants = clothesColors[Math.floor(Math.random() * clothesColors.length)];
+            const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+            const pants = pantsColors[Math.floor(Math.random() * pantsColors.length)];
             const clone = createSingleAvatar(false, x, z, scale, skin, shirt, pants);
             clone.group.visible = false;
             clone.group.userData.formationRow = rowIndex + 1;
