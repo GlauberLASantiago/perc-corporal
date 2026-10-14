@@ -1143,13 +1143,13 @@ const AVATAR_STYLES = [
     },
     {
         id: 'realista_glb',
-        icon: '🦾',
-        name: 'Manequim GLB (Técnico)',
-        subtitle: 'Esqueleto 3D / Arquivo Externo',
-        badge: '⚙️ Rigged Mesh',
-        badgeColor: '#64748b',
-        description: 'Modelo com malha de polígonos e esqueleto de ossos (rigged Mixamo). Ideal para testes técnicos ou para carregar seus próprios arquivos 3D baixados da internet.',
-        features: ['Esqueleto de ossos rigged', 'Suporte a arquivos .glb/.gltf', 'Modo técnico', 'Importação customizada']
+        icon: '🧍',
+        name: 'Personagem com Roupas (GLB)',
+        subtitle: 'Modelo 3D com Uniforme e Botas',
+        badge: '👕 Com Roupas',
+        badgeColor: '#2563eb',
+        description: 'Modelo 3D humano com roupas reais (jaqueta, calça, cinto e botas) e texturas detalhadas. Sem nenhum aspecto de esqueleto vermelho, com esqueleto de ossos Mixamo 100% animado.',
+        features: ['Roupas e jaqueta completas', 'Botas e texturas reais', 'Esqueleto Mixamo animado', 'Sem aspecto de esqueleto']
     }
 ];
 
@@ -3246,7 +3246,7 @@ function initThreeJS() {
 
     initAvatars();
     if (state.avatarStyle === 'realista_glb' && state.avatarModel === 'realista') {
-        loadGLBModel('xbot.glb');
+        loadGLBModel('soldier.glb');
     }
 
     window.addEventListener('resize', () => {
@@ -4439,7 +4439,21 @@ function createGLBAvatar(isMain, x, z, scaleParam, template) {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            if (child.material) {
+            if (child.name === 'Beta_Surface') {
+                // Remove qualquer aspecto de esqueleto vermelho caso o modelo xbot seja carregado:
+                // reveste a superfície com um macacão esportivo moderno azul marinho escuro
+                child.material = new THREE.MeshStandardMaterial({
+                    color: isMain ? 0x243342 : 0x1a252f,
+                    roughness: 0.55,
+                    metalness: 0.1
+                });
+            } else if (child.name === 'Beta_Joints') {
+                child.material = new THREE.MeshStandardMaterial({
+                    color: 0x1f2428,
+                    roughness: 0.65,
+                    metalness: 0.2
+                });
+            } else if (child.material) {
                 child.material = child.material.clone();
             }
         }
@@ -4580,7 +4594,7 @@ function selectAvatarStyle(styleId) {
             updateAvatarModelUI();
             renderAvatarShowcaseCards();
         } else {
-            loadGLBModel('xbot.glb', () => {
+            loadGLBModel('soldier.glb', () => {
                 renderAvatarShowcaseCards();
                 updateAvatarModelUI();
             });
@@ -4632,6 +4646,7 @@ function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
         console.warn('GLTFLoader não disponível');
         return;
     }
+    const targetFile = sourceUrlOrBuffer || 'soldier.glb';
     glbLoading = true;
     updateAvatarModelUI();
     const loader = new THREE.GLTFLoader();
@@ -4649,8 +4664,11 @@ function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
     const onFail = (err) => {
         console.warn('Falha ao carregar modelo GLB primário:', err);
         // Fallback para URL pública do Three.js com CORS liberado
-        if (typeof sourceUrlOrBuffer === 'string' && sourceUrlOrBuffer === 'xbot.glb') {
-            loader.load('https://threejs.org/examples/models/gltf/Xbot.glb', onSuccess, undefined, (fallbackErr) => {
+        if (typeof targetFile === 'string' && (targetFile === 'soldier.glb' || targetFile === 'xbot.glb')) {
+            const fallbackUrl = (targetFile === 'soldier.glb')
+                ? 'https://threejs.org/examples/models/gltf/Soldier.glb'
+                : 'https://threejs.org/examples/models/gltf/Xbot.glb';
+            loader.load(fallbackUrl, onSuccess, undefined, (fallbackErr) => {
                 console.warn('Fallback online também falhou:', fallbackErr);
                 glbLoading = false;
                 state.avatarStyle = 'boneco_madeira';
