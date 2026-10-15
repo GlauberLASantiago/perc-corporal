@@ -3399,13 +3399,13 @@ function buildBonecoMadeira(isMain, x, z, scaleParam) {
     chestTorso.castShadow = true;
     group.add(chestTorso);
 
-    // Almofadas de percussão no peito (Peito L e R) em nogueira torneada
+    // Almofadas de percussão no peito (Peito L e R) em placas anatômicas (menos salientes, mais largas na vertical)
     [-1, 1].forEach(sign => {
         const side = (sign === -1) ? 'L' : 'R';
-        const chestPadGeo = new THREE.CylinderGeometry(2.3, 2.6, 1.2, 18);
+        const chestPadGeo = new THREE.BoxGeometry(3.4, 6.2, 0.45);
         const chestPad = new THREE.Mesh(chestPadGeo, matJoint.clone());
-        chestPad.position.set(sign * 3.2, 28.5, 2.9);
-        chestPad.rotation.x = Math.PI / 2;
+        chestPad.position.set(sign * 2.8, 28.8, 4.3);
+        chestPad.rotation.y = sign * -0.14;
         setupGlowAndShadow(chestPad);
         group.add(chestPad);
         parts[side].meshes['Peito'] = chestPad;
@@ -3656,12 +3656,13 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
     chestTorso.castShadow = true;
     group.add(chestTorso);
 
-    // Núcleo luminoso no peito (Peito L e R)
+    // Painéis de energia no peito (Peito L e R) em placas verticais elegantes (menos salientes, mais largas na vertical)
     [-1, 1].forEach(sign => {
         const side = (sign === -1) ? 'L' : 'R';
-        const corePad = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.5, 1.0, 18), matCore.clone());
-        corePad.position.set(sign * 3.1, 28.5, 2.9);
-        corePad.rotation.x = Math.PI / 2;
+        const corePadGeo = new THREE.BoxGeometry(3.3, 6.0, 0.4);
+        const corePad = new THREE.Mesh(corePadGeo, matCore.clone());
+        corePad.position.set(sign * 2.8, 28.8, 4.35);
+        corePad.rotation.y = sign * -0.14;
         setupGlowAndShadow(corePad);
         group.add(corePad);
         parts[side].meshes['Peito'] = corePad;
@@ -3856,11 +3857,13 @@ function buildMinimalistaNordico(isMain, x, z, scaleParam) {
     chestTorso.castShadow = true;
     group.add(chestTorso);
 
+    // Placas de percussão nórdicas verticais (menos salientes, mais largas na vertical)
     [-1, 1].forEach(sign => {
         const side = (sign === -1) ? 'L' : 'R';
-        const chestPad = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.5, 1.1, 18), matSage.clone());
-        chestPad.position.set(sign * 3.2, 28.5, 2.9);
-        chestPad.rotation.x = Math.PI / 2;
+        const chestPadGeo = new THREE.BoxGeometry(3.3, 6.0, 0.42);
+        const chestPad = new THREE.Mesh(chestPadGeo, matSage.clone());
+        chestPad.position.set(sign * 2.8, 28.8, 4.3);
+        chestPad.rotation.y = sign * -0.14;
         setupGlowAndShadow(chestPad);
         group.add(chestPad);
         parts[side].meshes['Peito'] = chestPad;
@@ -4110,24 +4113,27 @@ function buildEsqueletoFitness(isMain, x, z, scaleParam, skinHex, shirtHex, pant
     vest.castShadow = true;
     group.add(vest);
 
-    const peitoralGeoL = new THREE.SphereGeometry(3.4, 18, 16);
-    peitoralGeoL.scale(1.05, 0.9, 0.55);
+    // Placas peitorais atléticas na regata (menos salientes, mais largas na vertical)
+    const peitoralGeoL = new THREE.SphereGeometry(2.7, 20, 16);
+    peitoralGeoL.scale(1.0, 1.48, 0.16);
     const chestL = new THREE.Mesh(peitoralGeoL, matDryFit.clone());
-    chestL.position.set(-3.0, 28.5, 2.9);
+    chestL.position.set(-2.8, 29.0, 4.1);
+    chestL.rotation.y = -0.15;
     setupGlowAndShadow(chestL);
     group.add(chestL);
     parts.L.meshes['Peito'] = chestL;
 
-    const peitoralGeoR = new THREE.SphereGeometry(3.4, 18, 16);
-    peitoralGeoR.scale(1.05, 0.9, 0.55);
+    const peitoralGeoR = new THREE.SphereGeometry(2.7, 20, 16);
+    peitoralGeoR.scale(1.0, 1.48, 0.16);
     const chestR = new THREE.Mesh(peitoralGeoR, matDryFit.clone());
-    chestR.position.set(3.0, 28.5, 2.9);
+    chestR.position.set(2.8, 29.0, 4.1);
+    chestR.rotation.y = 0.15;
     setupGlowAndShadow(chestR);
     group.add(chestR);
     parts.R.meshes['Peito'] = chestR;
 
     const emblem = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.2), matAccent);
-    emblem.position.set(-3.0, 30.2, 4.3);
+    emblem.position.set(-2.8, 32.2, 4.35);
     emblem.rotation.z = -0.2;
     group.add(emblem);
 
@@ -4545,26 +4551,28 @@ function buildAtletaExercicios(isMain, x, z, scaleParam, skinHex, shirtHex, pant
     waist.castShadow = true;
     group.add(waist);
 
-    // Peitorais percussivos (brilham no ritmo de Peito)
-    const peitoralGeoL = new THREE.SphereGeometry(3.6, 20, 16);
-    peitoralGeoL.scale(1.05, 0.9, 0.55);
+    // Peitorais atléticos percussivos (menos salientes, mais largos na vertical)
+    const peitoralGeoL = new THREE.SphereGeometry(2.8, 20, 16);
+    peitoralGeoL.scale(1.0, 1.5, 0.16);
     const chestL = new THREE.Mesh(peitoralGeoL, matDryFit.clone());
-    chestL.position.set(-3.2, 28.5, 3.0);
+    chestL.position.set(-2.8, 29.0, 4.25);
+    chestL.rotation.y = -0.15;
     setupGlowAndShadow(chestL);
     group.add(chestL);
     parts.L.meshes['Peito'] = chestL;
 
-    const peitoralGeoR = new THREE.SphereGeometry(3.6, 20, 16);
-    peitoralGeoR.scale(1.05, 0.9, 0.55);
+    const peitoralGeoR = new THREE.SphereGeometry(2.8, 20, 16);
+    peitoralGeoR.scale(1.0, 1.5, 0.16);
     const chestR = new THREE.Mesh(peitoralGeoR, matDryFit.clone());
-    chestR.position.set(3.2, 28.5, 3.0);
+    chestR.position.set(2.8, 29.0, 4.25);
+    chestR.rotation.y = 0.15;
     setupGlowAndShadow(chestR);
     group.add(chestR);
     parts.R.meshes['Peito'] = chestR;
 
     // Emblema esportivo no peito
     const logoBadge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, 0.2), matAccentCyan);
-    logoBadge.position.set(-3.2, 30.2, 4.4);
+    logoBadge.position.set(-2.8, 32.4, 4.45);
     logoBadge.rotation.z = -0.2;
     group.add(logoBadge);
 
@@ -5089,19 +5097,21 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
     waist.castShadow = true;
     group.add(waist);
 
-    // Peitorais anatômicos integrados (iluminam no golpe de Peito)
-    const peitoralGeoL = new THREE.SphereGeometry(3.6, 20, 16);
-    peitoralGeoL.scale(1.05, 0.9, 0.55);
+    // Peitorais discretos da camiseta (menos salientes, mais largos na vertical)
+    const peitoralGeoL = new THREE.SphereGeometry(2.8, 20, 16);
+    peitoralGeoL.scale(1.0, 1.5, 0.16);
     const chestL = new THREE.Mesh(peitoralGeoL, matShirt.clone());
-    chestL.position.set(-3.2, 28.5, 3.0);
+    chestL.position.set(-2.8, 29.0, 4.25);
+    chestL.rotation.y = -0.15;
     setupGlowAndShadow(chestL);
     group.add(chestL);
     parts.L.meshes['Peito'] = chestL;
 
-    const peitoralGeoR = new THREE.SphereGeometry(3.6, 20, 16);
-    peitoralGeoR.scale(1.05, 0.9, 0.55);
+    const peitoralGeoR = new THREE.SphereGeometry(2.8, 20, 16);
+    peitoralGeoR.scale(1.0, 1.5, 0.16);
     const chestR = new THREE.Mesh(peitoralGeoR, matShirt.clone());
-    chestR.position.set(3.2, 28.5, 3.0);
+    chestR.position.set(2.8, 29.0, 4.25);
+    chestR.rotation.y = 0.15;
     setupGlowAndShadow(chestR);
     group.add(chestR);
     parts.R.meshes['Peito'] = chestR;
