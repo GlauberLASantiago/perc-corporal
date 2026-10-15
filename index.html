@@ -3579,10 +3579,9 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
     };
 
-    const matChassis = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.18, metalness: 0.15 });
+    const matChassis = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.2, metalness: 0.12 });
     const matVisor   = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.08, metalness: 0.35 });
     const matGlowEye = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-    const matCore    = new THREE.MeshBasicMaterial({ color: 0x00d2ff });
     const matDark    = new THREE.MeshStandardMaterial({ color: 0x242d3d, roughness: 0.5, metalness: 0.4 });
 
     const setupGlowAndShadow = (mesh) => {
@@ -3593,7 +3592,9 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         mesh.userData.isAnimating = false;
     };
 
-    // CABEÇA
+    // ==========================================
+    // CABEÇA & VISOR (y = 38)
+    // ==========================================
     const headGroup = new THREE.Group();
     headGroup.position.set(0, 38, 0);
 
@@ -3644,24 +3645,38 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
 
     group.add(headGroup);
 
-    // PESCOÇO
+    // ==========================================
+    // PESCOÇO, TÓRAX & REATORES DO PEITO
+    // ==========================================
     const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.2, 4.0, 18), matDark);
     neck.position.set(0, 32.5, 0);
     group.add(neck);
 
-    // TÓRAX
     const chestTorso = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.6, 8.5, 20), matChassis);
     chestTorso.position.set(0, 29.5, 0);
     chestTorso.scale.set(1.05, 1.0, 0.9);
     chestTorso.castShadow = true;
     group.add(chestTorso);
 
-    // Painéis de energia no peito (Peito L e R) em placas verticais elegantes (menos salientes, mais largas na vertical)
+    // Reatores de energia do peito (Peito L e R) em placas verticais bem visíveis na frente
     [-1, 1].forEach(sign => {
         const side = (sign === -1) ? 'L' : 'R';
-        const corePadGeo = new THREE.BoxGeometry(3.3, 6.0, 0.4);
-        const corePad = new THREE.Mesh(corePadGeo, matCore.clone());
-        corePad.position.set(sign * 2.8, 28.8, 4.35);
+        const frameGeo = new THREE.BoxGeometry(3.6, 6.2, 0.35);
+        const frame = new THREE.Mesh(frameGeo, matDark);
+        frame.position.set(sign * 2.8, 28.8, 4.95);
+        frame.rotation.y = sign * -0.14;
+        group.add(frame);
+
+        const matCore = new THREE.MeshStandardMaterial({
+            color: 0x00d2ff,
+            emissive: new THREE.Color(0x00b4d8),
+            emissiveIntensity: 0.75,
+            roughness: 0.25,
+            metalness: 0.3
+        });
+        const corePadGeo = new THREE.BoxGeometry(3.2, 5.8, 0.4);
+        const corePad = new THREE.Mesh(corePadGeo, matCore);
+        corePad.position.set(sign * 2.8, 28.8, 5.15);
         corePad.rotation.y = sign * -0.14;
         setupGlowAndShadow(corePad);
         group.add(corePad);
@@ -3674,13 +3689,17 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
 
     const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 5.0, 3.5, 20), matChassis);
     pelvis.position.set(0, 16.5, 0);
+    pelvis.castShadow = true;
     group.add(pelvis);
 
-    // MEMBROS
+    // ==========================================
+    // MEMBROS (BRAÇOS, PERNAS, MANOPLAS E BOTAS)
+    // ==========================================
     ['L', 'R'].forEach(side => {
         const isLeft = side === 'L';
         const sign   = isLeft ? -1 : 1;
 
+        // ---- BRAÇO & ANTEBRAÇO ----
         const armPivot = new THREE.Group();
         armPivot.position.set(sign * 8.8, 33, 0);
         armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18);
@@ -3706,22 +3725,25 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         forearmPivot.userData.animProgress = 0;
 
         const elbow = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 16), matDark);
+        elbow.castShadow = true;
         forearmPivot.add(elbow);
 
-        const forearmGeo = new THREE.CylinderGeometry(1.7, 1.4, 6.4, 16);
+        const forearmGeo = new THREE.CylinderGeometry(1.8, 1.5, 6.4, 16);
         forearmGeo.translate(0, -3.7, 0);
         const forearmMesh = new THREE.Mesh(forearmGeo, matChassis);
+        forearmMesh.castShadow = true;
         forearmPivot.add(forearmMesh);
 
-        // Mãos robóticas arredondadas com emissor na palma
-        const handGeo = new THREE.BoxGeometry(2.8, 3.2, 1.3);
-        handGeo.translate(0, -1.6, 0);
-        const handMesh = new THREE.Mesh(handGeo, matChassis.clone());
+        // Manopla robótica branca sólida e expressiva com emissor de palma
+        const matHand = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.2, metalness: 0.15 });
+        const handGeo = new THREE.BoxGeometry(2.8, 3.4, 1.8);
+        handGeo.translate(0, -1.7, 0);
+        const handMesh = new THREE.Mesh(handGeo, matHand);
         handMesh.position.set(0, -7.0, 0);
         setupGlowAndShadow(handMesh);
 
-        const palmEmitter = new THREE.Mesh(new THREE.CircleGeometry(0.85, 16), matGlowEye);
-        palmEmitter.position.set(0, -1.6, 0.67);
+        const palmEmitter = new THREE.Mesh(new THREE.CircleGeometry(0.9, 16), matGlowEye);
+        palmEmitter.position.set(0, -1.7, 0.92);
         handMesh.add(palmEmitter);
 
         forearmPivot.add(handMesh);
@@ -3733,7 +3755,7 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         parts[side].meshes['Palma']  = handMesh;
         parts[side].meshes['Estalo'] = handMesh;
 
-        // Perna
+        // ---- PERNAS (COXA, CANELA E BOTA HOVER) ----
         const legPivot = new THREE.Group();
         legPivot.position.set(sign * 3.7, 18, 0);
         legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
@@ -3742,11 +3764,14 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         legPivot.userData.animProgress = 0;
 
         const hip = new THREE.Mesh(new THREE.SphereGeometry(2.7, 16, 16), matDark);
+        hip.castShadow = true;
         legPivot.add(hip);
 
+        // Coxa robótica branca sólida
+        const matThigh = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.2, metalness: 0.15 });
         const thighGeo = new THREE.CylinderGeometry(3.0, 2.4, 11, 16);
         thighGeo.translate(0, -5.8, 0);
-        const thighMesh = new THREE.Mesh(thighGeo, matChassis.clone());
+        const thighMesh = new THREE.Mesh(thighGeo, matThigh);
         setupGlowAndShadow(thighMesh);
         legPivot.add(thighMesh);
 
@@ -3758,22 +3783,31 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         shinPivot.userData.animProgress = 0;
 
         const knee = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 16), matDark);
+        knee.castShadow = true;
         shinPivot.add(knee);
 
+        // Canela robótica branca sólida
+        const matShin = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.2, metalness: 0.15 });
         const shinGeo = new THREE.CylinderGeometry(2.4, 1.9, 10.5, 16);
         shinGeo.translate(0, -5.3, 0);
-        const shinMesh = new THREE.Mesh(shinGeo, matChassis.clone());
+        const shinMesh = new THREE.Mesh(shinGeo, matShin);
         setupGlowAndShadow(shinMesh);
         shinPivot.add(shinMesh);
 
-        // Botas hover futuristas com borda luminosa
+        // Botas hover futuristas completas
         const bootGroup = new THREE.Group();
         bootGroup.position.set(0, -10.5, 3.5);
 
+        const matFoot = new THREE.MeshStandardMaterial({ color: 0xf3f6fa, roughness: 0.2, metalness: 0.15 });
         const bootGeo = new THREE.BoxGeometry(4.0, 2.6, 8.2);
-        const footMesh = new THREE.Mesh(bootGeo, matChassis.clone());
+        const footMesh = new THREE.Mesh(bootGeo, matFoot);
         setupGlowAndShadow(footMesh);
         bootGroup.add(footMesh);
+
+        const toeCap = new THREE.Mesh(new THREE.SphereGeometry(2.0, 14, 12), matFoot);
+        toeCap.position.set(0, -0.1, 3.8);
+        toeCap.scale.set(0.98, 0.65, 0.85);
+        footMesh.add(toeCap);
 
         const hoverSole = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.7, 8.6), matGlowEye);
         hoverSole.position.set(0, -1.3, 0.2);
