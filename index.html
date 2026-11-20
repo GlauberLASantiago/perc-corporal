@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+    <script src="./body-motion.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
@@ -1031,6 +1032,11 @@
 
         <button id="avatar-showcase-btn" style="background: linear-gradient(135deg, #e67e22, #d35400); color:white; font-weight: bold; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Abrir Mostruário de Avatares 3D">🎭 Mostruário de Avatares</button>
         <input type="file" id="glb-file-input" accept=".glb,.gltf" style="display:none;">
+        <label for="stage-setting">Cenário</label>
+        <select id="stage-setting">
+            <option value="studio">Estúdio</option><option value="dance">Sala de dança</option>
+            <option value="theatre">Teatro</option><option value="park">Praça</option>
+        </select>
 
         <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
         <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Melodia: OFF</button>
@@ -1101,7 +1107,7 @@ const state = {
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
     selectedTool: null, draggedData: null,
     sequencerMode: 'lateral',
-    avatarStyle: 'boneco_madeira', // 'boneco_madeira', 'mascote_robo', 'estudante', 'minimalista', 'realista_glb'
+    avatarStyle: 'estudante',
     avatarModel: 'procedural' // 'procedural' ou 'realista' (GLB)
 };
 
@@ -3283,6 +3289,7 @@ function initThreeJS() {
     gridHelper.material.transparent = true;
     gridHelper.position.y = 0.1; 
     scene.add(gridHelper);
+    setupStageSettings(scene, floorMaterial, gridHelper, hemiLight);
 
     initAvatars();
     if (state.avatarModel === 'realista') {
@@ -5007,12 +5014,12 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
     [-1, 1].forEach(eyeSign => {
         const eyeX = eyeSign * 1.8;
         const eyeY = 0.7;
-        const eyeZ = 4.8;
+        const eyeZ = 5.36;
 
         const scleraGeo = new THREE.SphereGeometry(0.85, 20, 20);
         const sclera = new THREE.Mesh(scleraGeo, matEyeWhite);
         sclera.position.set(eyeX, eyeY, eyeZ);
-        sclera.scale.set(1.05, 0.9, 0.55);
+        sclera.scale.set(.98, .67, .55);
         headGroup.add(sclera);
 
         const irisGeo = new THREE.CircleGeometry(0.48, 18);
@@ -5066,35 +5073,25 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
     headGroup.add(noseTip);
 
     // Boca amigável
-    const mouthGeo = new THREE.TorusGeometry(1.15, 0.18, 10, 20, Math.PI * 0.55);
+    const mouthGeo = new THREE.TorusGeometry(1.15, 0.13, 10, 20, Math.PI * 0.55);
     const mouth = new THREE.Mesh(mouthGeo, matLips);
-    mouth.position.set(0, -2.1, 4.8);
+    mouth.position.set(0, -1.8, 5.44);
     mouth.rotation.set(-0.35, 0, -Math.PI * 0.77);
     headGroup.add(mouth);
 
-    // Volume e estilo do cabelo
-    const hairBase = new THREE.Mesh(new THREE.SphereGeometry(5.95, 32, 20), matHair);
-    hairBase.position.set(0, 1.2, -0.7);
-    hairBase.scale.set(0.99, 1.06, 1.05);
-    headGroup.add(hairBase);
-
-    // Topete estilizado em mechas anguladas
-    const quiffGeo = new THREE.BoxGeometry(6.6, 2.6, 4.4);
-    const quiff = new THREE.Mesh(quiffGeo, matHair);
-    quiff.position.set(0, 4.8, 2.4);
-    quiff.rotation.x = -0.32;
-    headGroup.add(quiff);
-
-    const quiffFront = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.6, 2.2), matHair);
-    quiffFront.position.set(0, 4.2, 4.2);
-    quiffFront.rotation.x = -0.45;
-    headGroup.add(quiffFront);
-
-    [-1, 1].forEach(sideSign => {
-        const sideburn = new THREE.Mesh(new THREE.BoxGeometry(0.7, 3.2, 1.8), matHair);
-        sideburn.position.set(sideSign * 5.65, -0.6, 1.2);
-        headGroup.add(sideburn);
-    });
+    // A linha do cabelo sobe sobre a testa e desce até a nuca.
+    const hairGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2);
+    const vertices = hairGeo.attributes.position;
+    for (let i = 0; i < vertices.count; i++) {
+        const x = vertices.getX(i), y = vertices.getY(i), z = vertices.getZ(i);
+        const azimuth = Math.atan2(z, x);
+        const latitude = Math.acos(Math.min(1, y)) * (1.07 - .34 * Math.sin(azimuth));
+        vertices.setXYZ(i, 5.55 * Math.sin(latitude) * Math.cos(azimuth),
+            6.35 * Math.cos(latitude), 5.9 * Math.sin(latitude) * Math.sin(azimuth));
+    }
+    hairGeo.computeVertexNormals();
+    headGroup.add(new THREE.Mesh(hairGeo, matHair));
+    headGroup.scale.set(.86, .94, .90);
 
     group.add(headGroup);
 
@@ -5120,36 +5117,34 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
     group.add(collar);
 
     // ==========================================
-    // TORSO ANATÔMICO (Tórax atlético + Cintura)
-    // ==========================================
-    const chestTorsoGeo = new THREE.CylinderGeometry(6.6, 5.6, 8.5, 20);
-    const chestTorso = new THREE.Mesh(chestTorsoGeo, matShirt);
-    chestTorso.position.set(0, 29.5, 0);
-    chestTorso.scale.set(1.05, 1.0, 0.88);
-    chestTorso.castShadow = true;
-    group.add(chestTorso);
-
-    const waistGeo = new THREE.CylinderGeometry(5.4, 5.8, 7.5, 20);
-    const waist = new THREE.Mesh(waistGeo, matShirt);
-    waist.position.set(0, 22.0, 0);
-    waist.scale.set(1.02, 1.0, 0.85);
-    waist.castShadow = true;
-    group.add(waist);
+    // Perfis contínuos de roupa e pele, medidos a partir da articulação.
+    function profile(points) {
+        return new THREE.LatheGeometry(points.map(([radius, height]) =>
+            new THREE.Vector2(radius, height)), 28);
+    }
+    const shirtGeo = profile([[0, 18], [5.85, 18], [5.6, 21], [5.45, 24],
+        [5.95, 26.5], [6.8, 29], [7.15, 31], [6.9, 32.1], [4.7, 33], [2.2, 33.5], [0, 33.5]]);
+    shirtGeo.translate(0, -26, 0);
+    const shirt = new THREE.Mesh(shirtGeo, matShirt);
+    shirt.position.y = 26;
+    shirt.scale.z = .78;
+    shirt.castShadow = true;
+    group.add(shirt);
 
     // Peitorais discretos da camiseta (menos salientes, mais largos na vertical)
     const peitoralGeoL = new THREE.SphereGeometry(2.8, 20, 16);
-    peitoralGeoL.scale(1.0, 1.5, 0.16);
+    peitoralGeoL.scale(1.0, .82, .18);
     const chestL = new THREE.Mesh(peitoralGeoL, matShirt.clone());
-    chestL.position.set(-2.8, 29.0, 4.25);
+    chestL.position.set(-2.8, 29.0, 4.18);
     chestL.rotation.y = -0.15;
     setupGlowAndShadow(chestL);
     group.add(chestL);
     parts.L.meshes['Peito'] = chestL;
 
     const peitoralGeoR = new THREE.SphereGeometry(2.8, 20, 16);
-    peitoralGeoR.scale(1.0, 1.5, 0.16);
+    peitoralGeoR.scale(1.0, .82, .18);
     const chestR = new THREE.Mesh(peitoralGeoR, matShirt.clone());
-    chestR.position.set(2.8, 29.0, 4.25);
+    chestR.position.set(2.8, 29.0, 4.18);
     chestR.rotation.y = 0.15;
     setupGlowAndShadow(chestR);
     group.add(chestR);
@@ -5178,11 +5173,9 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
     // ==========================================
     // GEOMETRIAS ANATÔMICAS DAS PERNAS
     // ==========================================
-    const thighGeo = new THREE.CylinderGeometry(3.2, 2.7, 12, 18);
-    thighGeo.translate(0, -6, 0);
+    const thighGeo = profile([[0, -12], [2.38, -12], [2.6, -9], [3.04, -6], [3.3, -2.4], [3.15, 0], [0, 0]]);
 
-    const shinGeo = new THREE.CylinderGeometry(2.6, 2.0, 11, 18);
-    shinGeo.translate(0, -5.5, 0);
+    const shinGeo = profile([[0, -11], [1.76, -11], [1.87, -7.8], [2.48, -4.6], [2.55, -2.7], [2.35, 0], [0, 0]]);
 
     // ==========================================
     // BRAÇOS E PERNAS (L e R)
@@ -5193,7 +5186,7 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
 
         // ---- BRAÇO (Ombro) ----
         const armPivot = new THREE.Group();
-        armPivot.position.set(sign * 9, 33, 0); 
+        armPivot.position.set(sign * 7.75, 32, 0);
         armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18); 
         armPivot.rotation.copy(armPivot.userData.restingRot);
         armPivot.userData.isAnimating = false;
@@ -5238,8 +5231,7 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
         elbowMesh.receiveShadow = true;
         forearmPivot.add(elbowMesh);
 
-        const forearmGeo = new THREE.CylinderGeometry(1.65, 1.35, 7.0, 18);
-        forearmGeo.translate(0, -3.5, 0);
+        const forearmGeo = profile([[0, -7], [1.13, -7], [1.18, -5.65], [1.53, -3.5], [1.77, -1.9], [1.65, 0], [0, 0]]);
         const forearmMesh = new THREE.Mesh(forearmGeo, matSkin.clone());
         forearmMesh.castShadow = true;
         forearmMesh.receiveShadow = true;
@@ -5252,7 +5244,8 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
         // ---- MÃOS ANATÔMICAS ----
         const handMat = matSkin.clone();
         
-        const palmGeo = new THREE.BoxGeometry(2.9, 3.7, 1.1);
+        const palmGeo = new THREE.SphereGeometry(1, 20, 16);
+        palmGeo.scale(1.52, 2.12, .62);
         palmGeo.translate(0, -1.85, 0);
         
         const handMesh = new THREE.Mesh(palmGeo, handMat);
@@ -5290,7 +5283,7 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
             const xOffset = (-1.5 + i) * fingerSpacing;
             const fingerX = sign * xOffset;
             
-            fingerMesh.position.set(fingerX, -3.7, 0);
+            fingerMesh.position.set(fingerX, -3.14, 0);
             fingerMesh.rotation.x = 0.15; 
             fingerMesh.castShadow = true;
             
@@ -5435,6 +5428,7 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         }
     });
 
+    if (template === glbTemplates['soldier.glb']) clonedModel.rotation.y += Math.PI;
     group.add(clonedModel);
 
     const findBone = (regex) => {
@@ -5493,6 +5487,9 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
     const parts = {
         L: {
             armPivot: armPivotL,
+            wrist: findBone(/lefthand$/i), middle: findBone(/lefthandmiddle1$/i),
+            index: findBone(/lefthandindex1$/i), pinky: findBone(/lefthandpinky1$/i),
+            foot: findBone(/leftfoot$/i), toe: findBone(/lefttoebase$/i),
             forearmPivot: forearmPivotL,
             legPivot: legPivotL,
             shinPivot: shinPivotL,
@@ -5500,6 +5497,9 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         },
         R: {
             armPivot: armPivotR,
+            wrist: findBone(/righthand$/i), middle: findBone(/righthandmiddle1$/i),
+            index: findBone(/righthandindex1$/i), pinky: findBone(/righthandpinky1$/i),
+            foot: findBone(/rightfoot$/i), toe: findBone(/righttoebase$/i),
             forearmPivot: forearmPivotR,
             legPivot: legPivotR,
             shinPivot: shinPivotR,
@@ -5690,7 +5690,9 @@ function initAvatars() {
         if (isUsingGLB) {
             return createGLBAvatar(isMain, x, z, scale, activeTemplate, state.avatarStyle);
         } else {
-            return createSingleAvatar(state.avatarStyle || 'boneco_madeira', isMain, x, z, scale, skin, shirt, pants);
+            const avatar = createSingleAvatar(state.avatarStyle || 'estudante', isMain, x, z, scale, skin, shirt, pants);
+            BodyMotion.prepareTorso(avatar);
+            return avatar;
         }
     };
 
@@ -5802,32 +5804,13 @@ function updateTurmaButton() {
     }
 }
 
-function triggerAnimation(side, type) {
+function triggerAnimation(side, type, impact = performance.now() + 110) {
     allAvatars.forEach(avatar => {
         if (!avatar.group.visible) return;
-
-        if (type === 'Palma') {
-            ['L', 'R'].forEach(s => {
-                const mesh = avatar.parts[s].meshes['Palma'];
-                if(mesh) {
-                    mesh.userData.targetScale = 1.6;
-                    mesh.userData.isAnimating = true;
-                    mesh.material.emissive = new THREE.Color(0xffffff);
-                    mesh.material.emissiveIntensity = 1.0;
-                }
-                const armPivot = avatar.parts[s].armPivot;
-                armPivot.userData.isAnimating = true;
-                armPivot.userData.animProgress = 0;
-                armPivot.userData.animType = 'Palma';
-
-                const forearmPivot = avatar.parts[s].forearmPivot;
-                if (forearmPivot) {
-                    forearmPivot.userData.isAnimating = true;
-                    forearmPivot.userData.animProgress = 0;
-                    forearmPivot.userData.animType = 'Palma';
-                }
-            });
-            return; 
+        if (BodyMotion.supports(type)) {
+            const sides = type === 'Palma' ? ['L', 'R'] : [side];
+            sides.forEach(s => BodyMotion.begin(avatar, s, type, impact));
+            return;
         }
 
         // Iluminar apenas o mesh relevante
@@ -5845,6 +5828,7 @@ function triggerAnimation(side, type) {
 
         if (type !== 'Pé') {
             const armPivot = avatar.parts[side].armPivot;
+            if (!armPivot) return;
             armPivot.userData.isAnimating = true;
             armPivot.userData.animProgress = 0;
             armPivot.userData.animType = type;
@@ -5857,6 +5841,7 @@ function triggerAnimation(side, type) {
             }
         } else {
             const legPivot = avatar.parts[side].legPivot;
+            if (!legPivot) return;
             legPivot.userData.isAnimating = true;
             legPivot.userData.animProgress = 0;
             legPivot.userData.animType = type;
@@ -5869,12 +5854,30 @@ function triggerAnimation(side, type) {
     });
 }
 
+let previousPoseTime = performance.now();
 function animate3D() {
     requestAnimationFrame(animate3D);
+    const now = performance.now();
+    const delta = Math.min(.1, (now - previousPoseTime) / 1000);
+    previousPoseTime = now;
     controls.update();
 
     if (audioCtx && state.isPlaying) {
         let currTime = audioCtx.currentTime;
+        // Prepara o braço antes do som; pé, deslocamento e cursor seguem o pulso.
+        for (const evt of visualQueue) {
+            const untilHit = evt.time + getVisualDelaySeconds() - currTime;
+            if (untilHit > Math.min(.095, secondsPerStep() * .65)) break;
+            if (evt.armsPrepared) continue;
+            evt.armsPrepared = true;
+            if (evt.data.L === 'Palma' || evt.data.R === 'Palma') {
+                triggerAnimation('L', 'Palma', now + untilHit * 1000);
+            } else {
+                for (const side of ['L', 'R']) {
+                    if (BodyMotion.supports(evt.data[side])) triggerAnimation(side, evt.data[side], now + untilHit * 1000);
+                }
+            }
+        }
         while (visualQueue.length > 0 && (visualQueue[0].time + getVisualDelaySeconds()) <= currTime + 0.005) {
             let evt = visualQueue.shift();
 
@@ -5900,8 +5903,8 @@ function animate3D() {
                 if (evt.data.Move) applyMoveCommand(evt.data.Move);
             }
 
-            if (evt.data.L) triggerAnimation('L', evt.data.L);
-            if (evt.data.R) triggerAnimation('R', evt.data.R);
+            if (evt.data.L && !BodyMotion.supports(evt.data.L)) triggerAnimation('L', evt.data.L);
+            if (evt.data.R && !BodyMotion.supports(evt.data.R)) triggerAnimation('R', evt.data.R);
 
             updatePlayheadUI(evt.step);
         }
@@ -5940,6 +5943,9 @@ function animate3D() {
         avatar.group.rotation.y += diff * 0.15;
 
         // Atualização do AnimationMixer (Idle/Walk suave e realista para modelos GLB)
+        BodyMotion.restore(avatar.parts.L);
+        BodyMotion.restore(avatar.parts.R);
+        BodyMotion.lean(avatar, now, delta);
         if (avatar.mixer) {
             if (avatar.actions && avatar.actions.walk && avatar.actions.idle) {
                 const walkWeight = Math.min(1.0, walkingIntensity * 1.6);
@@ -5949,7 +5955,7 @@ function animate3D() {
                     avatar.actions.walk.play();
                 }
             }
-            avatar.mixer.update(0.016);
+            avatar.mixer.update(delta);
         }
 
         const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
@@ -5969,7 +5975,7 @@ function animate3D() {
         }
 
         ['L', 'R'].forEach(side => {
-            const sign = (side === 'L') ? -1 : 1;
+            const sign = avatar.isGLB ? (side === 'L' ? -1 : 1) : (side === 'L' ? 1 : -1);
             
             const armPivot  = avatar.parts[side].armPivot;
             const legPivot  = avatar.parts[side].legPivot;
@@ -6080,7 +6086,7 @@ function animate3D() {
 
                 const forearmPivot = avatar.parts[side].forearmPivot;
                 if (forearmPivot && !forearmPivot.userData.isAnimating) {
-                    const walkElbow = walkingIntensity > 0.01 ? -(0.15 + Math.abs(swing) * 0.3) : 0;
+                    const walkElbow = forearmPivot.userData.restingRot.x - Math.abs(swing) * 0.3;
                     forearmPivot.rotation.x += (walkElbow - forearmPivot.rotation.x) * 0.2;
                 }
 
@@ -6160,6 +6166,7 @@ function animate3D() {
                 }
             }
 
+            BodyMotion.pose(avatar, side, now);
             // Animação de escala + glow dos meshes
             const meshesProcessed = new Set(); 
             Object.values(avatar.parts[side].meshes).forEach(mesh => {
@@ -6197,10 +6204,11 @@ function toggleGlossary() { document.getElementById('glossary-panel').classList.
 function previewGlossaryStep(type) {
     initAudio();
     const side = Math.random() > 0.5 ? 'R' : 'L'; 
+    if (BodyMotion.supports(type)) triggerAnimation(side, type, performance.now() + 100);
     setTimeout(() => {
         const t = audioCtx.currentTime;
         playPercussionSound(t, side, type); 
-        triggerAnimation(side, type);
+        if (!BodyMotion.supports(type)) triggerAnimation(side, type);
     }, 100);
 }
 
