@@ -155,8 +155,6 @@ function buildCartoon(style, isMain, x, z, scale) {
         if(!capy) oval(foot,ivory,0,-1.17,1.18,2.27,.72,3.5);
         const pad=oval(torso,shirt,s*2.65,2.1,3.95,2.6,2.7,1.2);
         pad.visible=false;
-        // Grupos de contato conservam escala unitária durante os realces.
-        foot.material=sole;wrist.material=skin;
         parts[side]={armPivot:arm,forearmPivot:elbow,legPivot:leg,shinPivot:knee,
             meshes:{Palma:wrist,Estalo:wrist,Peito:pad,Coxa:thigh,'Pé':foot}};
     }
