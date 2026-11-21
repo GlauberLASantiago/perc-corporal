@@ -38,7 +38,7 @@ A professora e a aluna usam a [base do MakeHuman](https://github.com/makehumanco
     *   **⚡ Esqueleto com Roupa de Exercícios (GLB)**: O manequim esqueleto 3D vestindo roupas de treino: camiseta dry-fit esportiva sobre o tórax, bermuda de corrida com listras atléticas, tênis *running*, *smartwatch* e faixa de suor, mantendo as juntas mecânicas vermelhas visíveis!
     *   **📁 Carregador de Modelos Customizados**: Permite carregar qualquer arquivo `.glb` ou `.gltf` do computador diretamente pela interface do mostruário.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
-*   **Efeito Coletivo**: No modo turma, é aplicado um leve atraso espacial (delay e reverb) para emular o som acústico de um grupo de pessoas tocando em uma sala de aula.
+*   **Efeito Coletivo**: No modo turma, cinco tomadas diferentes de cada gesto são distribuídas no estéreo. A primeira marca o pulso e as demais entram de 5 a 23 ms depois. No modo solo, as tomadas se alternam a cada toque.
 
 ### 4. Camada Melódica e Áudio
 *   **Melodia Pentatônica**: Gera uma melodia monofônica paralela para Marimba (escala pentatônica de Dó maior) baseada na rítmica corporal programada.
@@ -62,7 +62,7 @@ A professora e a aluna usam a [base do MakeHuman](https://github.com/makehumanco
 *   **Estrutura**: HTML5 semântico
 *   **Estilo**: Vanilla CSS (layout responsivo e design escuro premium no palco 3D)
 *   **Gráficos 3D**: Three.js (com OrbitControls para manipulação da câmera)
-*   **Áudio**: Web Audio API (gerenciamento de buffers de áudio, panning estéreo, convolução de reverb e delay)
+*   **Áudio**: Web Audio API (gerenciamento de buffers de áudio, panning estéreo, reverberação por convolução)
 *   **Melodia Pentatônica**: WebAudioFontPlayer e soundfont-player
 *   **Partitura**: Renderização dinâmica SVG baseada nas durações rítmicas
 *   **Ícones**: Emojis unicode nativos

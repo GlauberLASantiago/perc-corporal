@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
     <script src="./body-motion.js"></script>
+    <script src="./percussao.js"></script>
     <script src="./scenery.js"></script>
     <script src="./class-avatars.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
@@ -1378,10 +1379,6 @@ let timerID;
 let mainMixNode = null;
 let reverbNode = null;
 let reverbGain = null;
-let delayNode = null;
-let delayFeedback = null;
-let delayGain = null;
-
 function createReverbImpulseResponse(duration, decay) {
     if (!audioCtx) return null;
     const sampleRate = audioCtx.sampleRate;
@@ -1399,21 +1396,6 @@ function createReverbImpulseResponse(duration, decay) {
     }
     return impulse;
 }
-
-const audioUrls = {
-    'Pé_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-d.mp3',
-    'Pé_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/pe-e.mp3',
-    'Coxa_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/coxa-d.mp3',
-    'Coxa_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/coxa-e.mp3',
-    'Estalo_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-d.mp3',
-    'Estalo_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/estalo-e.mp3',
-    'Palma': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/palmas.mp3',
-    'Peito_R': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito-d.mp3',
-    'Peito_L': 'https://raw.githubusercontent.com/GlauberLASantiago/perc-corporal/main/peito-e.mp3'
-};
-
-const audioBuffers = {};
-
 
 // --- GERADOR DE MELODIA MONOFÔNICA PARA MARIMBA ---
 const melodyState = {
@@ -1790,16 +1772,6 @@ function scheduleMelodyLayer(stepNumber, time, stepData) {
     playMelodyNote(note, time, Math.min(0.52, secondsPerStep() * 0.92), 0.42);
 }
 
-async function loadAudioSample(key, url) {
-    try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        audioBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
-    } catch (e) {
-        console.error("Erro ao carregar áudio:", key, e);
-    }
-}
-
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1821,26 +1793,6 @@ function initAudio() {
             console.error("Failed to initialize convolution reverb:", e);
         }
         
-        try {
-            delayNode = audioCtx.createDelay(1.0);
-            delayNode.delayTime.value = 0.07; // tempo de atraso de 70ms (<100ms)
-            delayFeedback = audioCtx.createGain();
-            delayFeedback.gain.value = 0.18; // feedback (realimentação) reduzido
-            delayGain = audioCtx.createGain();
-            delayGain.gain.value = 0.0; // seco inicialmente no modo solo
-            
-            mainMixNode.connect(delayNode);
-            delayNode.connect(delayFeedback);
-            delayFeedback.connect(delayNode); // loop de feedback
-            
-            delayNode.connect(delayGain);
-            delayGain.connect(audioCtx.destination);
-        } catch (e) {
-            console.error("Failed to initialize delay node:", e);
-        }
-
-        Object.keys(audioUrls).forEach(key => loadAudioSample(key, audioUrls[key]));
-        
         if (melodyState.masterGain) {
             try {
                 melodyState.masterGain.disconnect();
@@ -1853,43 +1805,17 @@ function initAudio() {
 }
 
 function updateTurmaEffects() {
-    if (!audioCtx || !delayGain || !reverbGain) return;
-    if (state.turmaMode) {
-        // Modo turma: delay ativado (reduzido) e reverb ligeiramente aumentado
-        delayGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
-        reverbGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
-    } else {
-        // Modo solo: delay zerado e reverb sutil de sala
-        delayGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.05);
-        reverbGain.gain.setTargetAtTime(0.10, audioCtx.currentTime, 0.05);
-    }
+    if (reverbGain) reverbGain.gain.setTargetAtTime(state.turmaMode ? .14 : .10, audioCtx.currentTime, .05);
 }
 
 function playPercussionSound(time, side, type) {
-    if (!audioCtx) return;
-    let bufferKey = type === 'Palma' ? type : `${type}_${side}`;
-    let buffer = audioBuffers[bufferKey];
-    if (!buffer) return;
-
-    const playSingleHit = (hitTime, hitPanValue, hitVol) => {
-        const gain = audioCtx.createGain();
-        const panNode = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
-        if(audioCtx.createStereoPanner) panNode.pan.value = hitPanValue;
-        gain.connect(panNode); 
-        panNode.connect(mainMixNode || audioCtx.destination);
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(gain);
-        gain.gain.setValueAtTime(hitVol, hitTime);
-        source.start(hitTime);
-    };
-
-    let baseVol = 1.0;
-    if(type === 'Pé') baseVol = 1.2;
-    if(type === 'Estalo') baseVol = 0.8;
-    if(type === 'Peito') baseVol = 1.2; 
-    let basePan = type === 'Palma' ? 0 : (side === 'L' ? -0.4 : 0.4);
-    playSingleHit(time, basePan, baseVol);
+    const bank = percussionBanks[type];
+    if (!audioCtx || !bank) return;
+    const pan = type === 'Palma' ? 0 : side === 'L' ? -.4 : .4;
+    const ensemble = state.turmaMode;
+    const play = () => playRecordedBeat(audioCtx, mainMixNode, bank, time, pan, ensemble);
+    if (bank.buffer) play();
+    else loadPercussionBank(audioCtx, bank).then(play).catch(console.error);
 }
 
 function playMetronome(time, beatIndex) {
@@ -1948,7 +1874,7 @@ function scheduleNote(stepNumber, time) {
     // não substituir os sons corporais.
     playMetronome(time, stepNumber);
     if (stepData.L) playPercussionSound(time, 'L', stepData.L);
-    if (stepData.R) playPercussionSound(time, 'R', stepData.R);
+    if (stepData.R && !(stepData.R === 'Palma' && stepData.L === 'Palma')) playPercussionSound(time, 'R', stepData.R);
     if (state.melodyOn) scheduleMelodyLayer(stepNumber, time, stepData);
 
     visualQueue.push({ step: stepNumber, time: time, data: stepData });
@@ -1964,7 +1890,23 @@ function scheduler() {
     timerID = window.setTimeout(scheduler, lookahead);
 }
 
-function togglePlayback() { initAudio(); state.isPlaying ? stopPlayback() : startPlayback(); }
+async function togglePlayback() {
+    initAudio();
+    if (state.isPlaying) return stopPlayback();
+    const button = document.getElementById('play-btn');
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = 'Carregando sons…';
+    try {
+        await Promise.all(Object.values(percussionBanks).map(bank => loadPercussionBank(audioCtx, bank)));
+        startPlayback();
+    } catch (error) {
+        console.error(error);
+        button.textContent = 'Tentar carregar sons';
+    } finally {
+        button.disabled = false;
+    }
+}
 
 function startPlayback() {
     state.isPlaying = true; 
