@@ -1112,21 +1112,10 @@ const state = {
     selectedTool: null, draggedData: null,
     sequencerMode: 'lateral',
     avatarStyle: 'professora', mixedClass: true,
-    avatarModel: 'procedural' // 'procedural' ou 'realista' (GLB)
 };
 
 const AVATAR_STYLES = [
     ...classStyles,
-    {
-        id: 'boneco_madeira',
-        icon: '🎨',
-        name: 'Boneco de Madeira',
-        subtitle: 'Manequim Artístico Clássico',
-        badge: '⭐ Recomendado',
-        badgeColor: '#e67e22',
-        description: 'O clássico manequim articulado de desenho e ateliê em madeira nobre polida (faia e nogueira). Acolhedor, elegante, zero sensação estranha (sem uncanny valley), perfeito para arte e música!',
-        features: ['Madeira nobre polida', 'Juntas esféricas torneadas', 'Acolhedor & Educativo', 'Sem uncanny valley']
-    },
     {
         id: 'mascote_robo',
         icon: '🤖',
@@ -1146,36 +1135,6 @@ const AVATAR_STYLES = [
         badgeColor: '#8e44ad',
         description: 'Personagem humano estilizado em proporções de animação, com camiseta colorida, calça jeans casual e tênis esportivos modernos (sneakers).',
         features: ['Roupas casuais da turma', 'Tênis sneakers esportivos', 'Anatomia estilizada', 'Visual contemporâneo']
-    },
-    {
-        id: 'minimalista',
-        icon: '✨',
-        name: 'Minimalista Nórdico',
-        subtitle: 'Design Clean Geométrico',
-        badge: '📐 Clean Studio',
-        badgeColor: '#334155',
-        description: 'Estética escandinava pura em tons foscos harmoniosos (ardósia, terracota e sálvia) com detalhes metálicos refinados. Elegância sutil e moderna.',
-        features: ['Geometria limpa e pura', 'Tons pastéis sofisticados', 'Detalhes em bronze', 'Estilo galeria de arte']
-    },
-    {
-        id: 'realista_glb',
-        icon: '🪖',
-        name: 'Traje de Combate (GLB)',
-        subtitle: 'Uniforme Militar Tático Mixamo',
-        badge: '🎖️ Tático',
-        badgeColor: '#2563eb',
-        description: 'Modelo 3D com uniforme militar tático de combate (jaqueta camuflada, calça cargo com bolsos táticos, cinto de equipamentos e botas de combate) animado com esqueleto Mixamo.',
-        features: ['Uniforme tático de combate', 'Jaqueta e calça camuflada', 'Botas de combate militares', 'Esqueleto Mixamo animado']
-    },
-    {
-        id: 'esqueleto_xbot',
-        icon: '🦾',
-        name: 'Esqueleto 3D / Manequim (X-Bot)',
-        subtitle: 'Malha Poligonal com Juntas Mecânicas',
-        badge: '🔥 Clássico Mixamo',
-        badgeColor: '#dc2626',
-        description: 'O clássico manequim esqueleto poligonal com juntas mecânicas vermelhas e estrutura anatômica Mixamo. Visual sci-fi biomecânico articulado puro!',
-        features: ['Juntas mecânicas vermelhas', 'Malha anatômica poligonal', 'Esqueleto Mixamo completo', 'Visual biomecânico sci-fi']
     },
     {
         id: 'esqueleto_fitness',
@@ -1199,12 +1158,7 @@ const AVATAR_STYLES = [
     }
 ];
 
-const glbTemplates = {
-    'soldier.glb': null,
-    'xbot.glb': null,
-    'custom': null
-};
-let glbTemplate = null;
+let customAvatarTemplate = null;
 let glbLoading = false;
 
 let targetBodyRotY = 0;
@@ -2260,13 +2214,7 @@ function initUI() {
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (evt) => {
-                loadGLBModel(evt.target.result, () => {
-                    state.avatarStyle = 'custom';
-                    state.avatarModel = 'realista';
-                    initAvatars();
-                    renderAvatarShowcaseCards();
-                    updateAvatarModelUI();
-                });
+                loadCustomAvatar(evt.target.result);
             };
             reader.readAsArrayBuffer(file);
         });
@@ -3312,14 +3260,6 @@ function initThreeJS() {
     animate3D();
 }
 
-/**
- * createSingleAvatar — Roteador de estilos de avatar 3D para o Mostruário.
- * Suporta os modelos:
- *  - 'boneco_madeira' : Manequim artístico clássico em madeira nobre torneada (sem uncanny valley)
- *  - 'mascote_robo'   : Robô futurista simpático com visor escuro e olhos luminosos
- *  - 'minimalista'    : Design clean nórdico em tons pastéis e formas puras
- *  - 'estudante'      : Personagem jovem casual com roupas contemporâneas e sneakers
- */
 function createSingleAvatar(styleId, isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex) {
     if (typeof styleId === 'boolean') {
         pantsHex = shirtHex;
@@ -3329,15 +3269,11 @@ function createSingleAvatar(styleId, isMain, x, z, scaleParam, skinHex, shirtHex
         z = x;
         x = isMain;
         isMain = styleId;
-        styleId = state.avatarStyle || 'boneco_madeira';
+        styleId = state.avatarStyle || 'estudante';
     }
-    const activeStyle = styleId || state.avatarStyle || 'boneco_madeira';
-    if (activeStyle === 'boneco_madeira') {
-        return buildBonecoMadeira(isMain, x, z, scaleParam);
-    } else if (activeStyle === 'mascote_robo') {
+    const activeStyle = styleId || state.avatarStyle || 'estudante';
+    if (activeStyle === 'mascote_robo') {
         return buildMascoteRobo(isMain, x, z, scaleParam);
-    } else if (activeStyle === 'minimalista') {
-        return buildMinimalistaNordico(isMain, x, z, scaleParam);
     } else if (activeStyle === 'atleta_exercicios') {
         return buildAtletaExercicios(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex);
     } else if (activeStyle === 'esqueleto_fitness') {
@@ -3345,233 +3281,6 @@ function createSingleAvatar(styleId, isMain, x, z, scaleParam, skinHex, shirtHex
     } else {
         return buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pantsHex);
     }
-}
-
-/**
- * buildBonecoMadeira — O clássico manequim articulado de madeira nobre polida
- * amplamente utilizado em ateliês e escolas de arte e música.
- * Zero estranheza ("uncanny valley"), visual acolhedor, expressivo e nobre.
- */
-function buildBonecoMadeira(isMain, x, z, scaleParam) {
-    const group = new THREE.Group();
-    group.position.set(x, 7, z);
-    group.userData.baseX = x;
-    group.userData.baseZ = z;
-    group.userData.baseRotY = 0;
-    group.userData.fileBaseX = x;
-    group.userData.fileBaseZ = z;
-    group.userData.fileBaseRotY = 0;
-    group.userData.circleBaseX = x;
-    group.userData.circleBaseZ = z;
-    group.userData.circleBaseRotY = 0;
-    group.scale.set(scaleParam, scaleParam, scaleParam);
-
-    const parts = {
-        L: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} },
-        R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
-    };
-
-    const matWood  = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.42, metalness: 0.04 });
-    const matJoint = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.38, metalness: 0.08 });
-    const matBrass = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.28, metalness: 0.85 });
-
-    const setupGlowAndShadow = (mesh) => {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.userData.baseColor = mesh.material.color.clone();
-        mesh.userData.targetScale = 1.0;
-        mesh.userData.isAnimating = false;
-    };
-
-    // CABEÇA: Ovo esculpido liso, sem feições humanas assustadoras (elimina uncanny valley)
-    const headGroup = new THREE.Group();
-    headGroup.position.set(0, 38, 0);
-
-    const headGeo = new THREE.SphereGeometry(5.4, 32, 24);
-    const head = new THREE.Mesh(headGeo, matWood);
-    head.scale.set(0.95, 1.15, 0.95);
-    head.castShadow = true;
-    headGroup.add(head);
-
-    // Botão torneado e pino de latão no topo da cabeça
-    const finial = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 1.2, 16), matJoint);
-    finial.position.set(0, 6.2, 0);
-    headGroup.add(finial);
-
-    const finialPin = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 14), matBrass);
-    finialPin.position.set(0, 7.1, 0);
-    headGroup.add(finialPin);
-
-    group.add(headGroup);
-
-    // PESCOÇO
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.0, 4.2, 16), matWood);
-    neck.position.set(0, 32.5, 0);
-    neck.castShadow = true;
-    group.add(neck);
-
-    // TÓRAX
-    const chestTorso = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.2, 8.5, 20), matWood);
-    chestTorso.position.set(0, 29.5, 0);
-    chestTorso.scale.set(1.05, 1.0, 0.88);
-    chestTorso.castShadow = true;
-    group.add(chestTorso);
-
-    // Almofadas de percussão no peito (Peito L e R) em placas anatômicas (menos salientes, mais largas na vertical)
-    [-1, 1].forEach(sign => {
-        const side = (sign === -1) ? 'L' : 'R';
-        const chestPadGeo = new THREE.BoxGeometry(3.4, 6.2, 0.45);
-        const chestPad = new THREE.Mesh(chestPadGeo, matJoint.clone());
-        chestPad.position.set(sign * 2.8, 28.8, 4.3);
-        chestPad.rotation.y = sign * -0.14;
-        setupGlowAndShadow(chestPad);
-        group.add(chestPad);
-        parts[side].meshes['Peito'] = chestPad;
-    });
-
-    // CINTURA
-    const waistBall = new THREE.Mesh(new THREE.SphereGeometry(4.5, 20, 20), matJoint);
-    waistBall.position.set(0, 22.0, 0);
-    waistBall.scale.set(1.05, 0.9, 0.88);
-    waistBall.castShadow = true;
-    group.add(waistBall);
-
-    // BACIA
-    const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 4.4, 4.0, 20), matWood);
-    pelvis.position.set(0, 16.5, 0);
-    pelvis.scale.set(1.05, 1.0, 0.88);
-    pelvis.castShadow = true;
-    group.add(pelvis);
-
-    // MEMBROS (BRAÇOS E PERNAS)
-    ['L', 'R'].forEach(side => {
-        const isLeft = side === 'L';
-        const sign   = isLeft ? -1 : 1;
-
-        // Ombro
-        const armPivot = new THREE.Group();
-        armPivot.position.set(sign * 8.6, 33, 0);
-        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18);
-        armPivot.rotation.copy(armPivot.userData.restingRot);
-        armPivot.userData.isAnimating = false;
-        armPivot.userData.animProgress = 0;
-
-        const shoulderBall = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 16), matJoint);
-        shoulderBall.castShadow = true;
-        armPivot.add(shoulderBall);
-
-        const shoulderPin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 4.8, 10), matBrass);
-        shoulderPin.rotation.z = Math.PI / 2;
-        armPivot.add(shoulderPin);
-
-        const bicepGeo = new THREE.CylinderGeometry(1.8, 1.5, 6.0, 16);
-        bicepGeo.translate(0, -3.8, 0);
-        const bicepMesh = new THREE.Mesh(bicepGeo, matWood);
-        bicepMesh.castShadow = true;
-        armPivot.add(bicepMesh);
-
-        // Cotovelo
-        const forearmPivot = new THREE.Group();
-        forearmPivot.position.set(0, -7.5, 0);
-        forearmPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
-        forearmPivot.userData.isAnimating = false;
-        forearmPivot.userData.animProgress = 0;
-
-        const elbowBall = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), matJoint);
-        elbowBall.castShadow = true;
-        forearmPivot.add(elbowBall);
-
-        const forearmGeo = new THREE.CylinderGeometry(1.5, 1.25, 6.5, 16);
-        forearmGeo.translate(0, -3.8, 0);
-        const forearmMesh = new THREE.Mesh(forearmGeo, matWood);
-        forearmMesh.castShadow = true;
-        forearmPivot.add(forearmMesh);
-
-        // Mãos esculpidas em madeira (Palma e Estalo)
-        const handGeo = new THREE.BoxGeometry(2.6, 3.4, 1.1);
-        handGeo.translate(0, -1.7, 0);
-        const handMesh = new THREE.Mesh(handGeo, matWood.clone());
-        handMesh.position.set(0, -7.0, 0);
-        setupGlowAndShadow(handMesh);
-
-        const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.45, 1.4, 10), matWood);
-        thumb.position.set(-sign * 1.4, -1.4, 0.2);
-        thumb.rotation.z = sign * 0.45;
-        handMesh.add(thumb);
-
-        const fingers = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.8, 0.9), matJoint);
-        fingers.position.set(0, -3.9, 0);
-        handMesh.add(fingers);
-
-        forearmPivot.add(handMesh);
-        armPivot.add(forearmPivot);
-        group.add(armPivot);
-
-        parts[side].armPivot = armPivot;
-        parts[side].forearmPivot = forearmPivot;
-        parts[side].meshes['Palma']  = handMesh;
-        parts[side].meshes['Estalo'] = handMesh;
-
-        // Quadril
-        const legPivot = new THREE.Group();
-        legPivot.position.set(sign * 3.6, 18, 0);
-        legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        legPivot.rotation.copy(legPivot.userData.restingRot);
-        legPivot.userData.isAnimating = false;
-        legPivot.userData.animProgress = 0;
-
-        const hipBall = new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 16), matJoint);
-        legPivot.add(hipBall);
-
-        const thighGeo = new THREE.CylinderGeometry(2.9, 2.3, 11, 16);
-        thighGeo.translate(0, -5.8, 0);
-        const thighMesh = new THREE.Mesh(thighGeo, matWood.clone());
-        setupGlowAndShadow(thighMesh);
-        legPivot.add(thighMesh);
-
-        // Joelho / Canela
-        const shinPivot = new THREE.Group();
-        shinPivot.position.set(0, -11.5, 0);
-        shinPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        shinPivot.rotation.copy(shinPivot.userData.restingRot);
-        shinPivot.userData.isAnimating = false;
-        shinPivot.userData.animProgress = 0;
-
-        const kneeBall = new THREE.Mesh(new THREE.SphereGeometry(2.1, 16, 16), matJoint);
-        kneeBall.castShadow = true;
-        shinPivot.add(kneeBall);
-
-        const shinGeo = new THREE.CylinderGeometry(2.3, 1.8, 10.5, 16);
-        shinGeo.translate(0, -5.3, 0);
-        const shinMesh = new THREE.Mesh(shinGeo, matWood.clone());
-        setupGlowAndShadow(shinMesh);
-        shinPivot.add(shinMesh);
-
-        // Pé em madeira esculpida
-        const footGroup = new THREE.Group();
-        footGroup.position.set(0, -10.5, 3.5);
-
-        const footGeo = new THREE.BoxGeometry(3.8, 2.4, 7.8);
-        const footMesh = new THREE.Mesh(footGeo, matWood.clone());
-        setupGlowAndShadow(footMesh);
-        footGroup.add(footMesh);
-
-        const sole = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 8.2), matJoint);
-        sole.position.set(0, -1.2, 0.2);
-        footMesh.add(sole);
-
-        shinPivot.add(footGroup);
-        legPivot.add(shinPivot);
-        group.add(legPivot);
-
-        parts[side].legPivot  = legPivot;
-        parts[side].shinPivot = shinPivot;
-        parts[side].meshes['Coxa'] = thighMesh;
-        parts[side].meshes['Pé']   = footMesh;
-    });
-
-    return { group, parts, isMain, id: Math.random().toString(36).substring(7) };
 }
 
 /**
@@ -3832,194 +3541,6 @@ function buildMascoteRobo(isMain, x, z, scaleParam) {
         footMesh.add(hoverSole);
 
         shinPivot.add(bootGroup);
-        legPivot.add(shinPivot);
-        group.add(legPivot);
-
-        parts[side].legPivot  = legPivot;
-        parts[side].shinPivot = shinPivot;
-        parts[side].meshes['Coxa'] = thighMesh;
-        parts[side].meshes['Pé']   = footMesh;
-    });
-
-    return { group, parts, isMain, id: Math.random().toString(36).substring(7) };
-}
-
-/**
- * buildMinimalistaNordico — Design escandinavo limpo em tons foscos elegantes,
- * proporções geométricas puras e auréola de bronze sutil.
- */
-function buildMinimalistaNordico(isMain, x, z, scaleParam) {
-    const group = new THREE.Group();
-    group.position.set(x, 7, z);
-    group.userData.baseX = x;
-    group.userData.baseZ = z;
-    group.userData.baseRotY = 0;
-    group.userData.fileBaseX = x;
-    group.userData.fileBaseZ = z;
-    group.userData.fileBaseRotY = 0;
-    group.userData.circleBaseX = x;
-    group.userData.circleBaseZ = z;
-    group.userData.circleBaseRotY = 0;
-    group.scale.set(scaleParam, scaleParam, scaleParam);
-
-    const parts = {
-        L: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} },
-        R: { armPivot: null, forearmPivot: null, legPivot: null, shinPivot: null, meshes: {} }
-    };
-
-    const matBody  = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.65, metalness: 0.05 });
-    const matWarm  = new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.68, metalness: 0.02 });
-    const matSage  = new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.7, metalness: 0.02 });
-    const matBrass = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.35, metalness: 0.75 });
-
-    const setupGlowAndShadow = (mesh) => {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.userData.baseColor = mesh.material.color.clone();
-        mesh.userData.targetScale = 1.0;
-        mesh.userData.isAnimating = false;
-    };
-
-    // CABEÇA: Esfera pura com auréola geométrica de latão
-    const headGroup = new THREE.Group();
-    headGroup.position.set(0, 38, 0);
-
-    const headGeo = new THREE.SphereGeometry(5.2, 28, 24);
-    const head = new THREE.Mesh(headGeo, matWarm);
-    head.scale.set(0.96, 1.1, 0.96);
-    head.castShadow = true;
-    headGroup.add(head);
-
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.28, 12, 32), matBrass);
-    ring.rotation.x = Math.PI / 3;
-    ring.position.y = 1.2;
-    headGroup.add(ring);
-
-    group.add(headGroup);
-
-    // PESCOÇO
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.0, 4.0, 16), matBrass);
-    neck.position.set(0, 32.5, 0);
-    group.add(neck);
-
-    // TÓRAX
-    const chestTorso = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.2, 8.5, 20), matBody);
-    chestTorso.position.set(0, 29.5, 0);
-    chestTorso.scale.set(1.05, 1.0, 0.88);
-    chestTorso.castShadow = true;
-    group.add(chestTorso);
-
-    // Placas de percussão nórdicas verticais (menos salientes, mais largas na vertical)
-    [-1, 1].forEach(sign => {
-        const side = (sign === -1) ? 'L' : 'R';
-        const chestPadGeo = new THREE.BoxGeometry(3.3, 6.0, 0.42);
-        const chestPad = new THREE.Mesh(chestPadGeo, matSage.clone());
-        chestPad.position.set(sign * 2.8, 28.8, 4.3);
-        chestPad.rotation.y = sign * -0.14;
-        setupGlowAndShadow(chestPad);
-        group.add(chestPad);
-        parts[side].meshes['Peito'] = chestPad;
-    });
-
-    const waist = new THREE.Mesh(new THREE.SphereGeometry(4.4, 20, 20), matBrass);
-    waist.position.set(0, 22.0, 0);
-    group.add(waist);
-
-    const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 4.6, 4.0, 20), matBody);
-    pelvis.position.set(0, 16.5, 0);
-    group.add(pelvis);
-
-    // MEMBROS
-    ['L', 'R'].forEach(side => {
-        const isLeft = side === 'L';
-        const sign   = isLeft ? -1 : 1;
-
-        const armPivot = new THREE.Group();
-        armPivot.position.set(sign * 8.6, 33, 0);
-        armPivot.userData.restingRot = new THREE.Euler(0, 0, sign * 0.18);
-        armPivot.rotation.copy(armPivot.userData.restingRot);
-        armPivot.userData.isAnimating = false;
-        armPivot.userData.animProgress = 0;
-
-        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 16), matBrass);
-        armPivot.add(shoulder);
-
-        const bicepGeo = new THREE.CylinderGeometry(1.8, 1.5, 6.0, 16);
-        bicepGeo.translate(0, -3.8, 0);
-        const bicepMesh = new THREE.Mesh(bicepGeo, matBody);
-        armPivot.add(bicepMesh);
-
-        const forearmPivot = new THREE.Group();
-        forearmPivot.position.set(0, -7.5, 0);
-        forearmPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        forearmPivot.rotation.copy(forearmPivot.userData.restingRot);
-        forearmPivot.userData.isAnimating = false;
-        forearmPivot.userData.animProgress = 0;
-
-        const elbow = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), matBrass);
-        forearmPivot.add(elbow);
-
-        const forearmGeo = new THREE.CylinderGeometry(1.5, 1.25, 6.5, 16);
-        forearmGeo.translate(0, -3.8, 0);
-        const forearmMesh = new THREE.Mesh(forearmGeo, matBody);
-        forearmPivot.add(forearmMesh);
-
-        const handGeo = new THREE.BoxGeometry(2.6, 3.4, 1.1);
-        handGeo.translate(0, -1.7, 0);
-        const handMesh = new THREE.Mesh(handGeo, matWarm.clone());
-        handMesh.position.set(0, -7.0, 0);
-        setupGlowAndShadow(handMesh);
-
-        forearmPivot.add(handMesh);
-        armPivot.add(forearmPivot);
-        group.add(armPivot);
-
-        parts[side].armPivot = armPivot;
-        parts[side].forearmPivot = forearmPivot;
-        parts[side].meshes['Palma']  = handMesh;
-        parts[side].meshes['Estalo'] = handMesh;
-
-        const legPivot = new THREE.Group();
-        legPivot.position.set(sign * 3.6, 18, 0);
-        legPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        legPivot.rotation.copy(legPivot.userData.restingRot);
-        legPivot.userData.isAnimating = false;
-        legPivot.userData.animProgress = 0;
-
-        const hip = new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 16), matBrass);
-        legPivot.add(hip);
-
-        const thighGeo = new THREE.CylinderGeometry(2.9, 2.3, 11, 16);
-        thighGeo.translate(0, -5.8, 0);
-        const thighMesh = new THREE.Mesh(thighGeo, matSage.clone());
-        setupGlowAndShadow(thighMesh);
-        legPivot.add(thighMesh);
-
-        const shinPivot = new THREE.Group();
-        shinPivot.position.set(0, -11.5, 0);
-        shinPivot.userData.restingRot = new THREE.Euler(0, 0, 0);
-        shinPivot.rotation.copy(shinPivot.userData.restingRot);
-        shinPivot.userData.isAnimating = false;
-        shinPivot.userData.animProgress = 0;
-
-        const knee = new THREE.Mesh(new THREE.SphereGeometry(2.1, 16, 16), matBrass);
-        shinPivot.add(knee);
-
-        const shinGeo = new THREE.CylinderGeometry(2.3, 1.8, 10.5, 16);
-        shinGeo.translate(0, -5.3, 0);
-        const shinMesh = new THREE.Mesh(shinGeo, matBody.clone());
-        setupGlowAndShadow(shinMesh);
-        shinPivot.add(shinMesh);
-
-        const footGroup = new THREE.Group();
-        footGroup.position.set(0, -10.5, 3.5);
-
-        const footGeo = new THREE.BoxGeometry(3.8, 2.4, 7.8);
-        const footMesh = new THREE.Mesh(footGeo, matBody.clone());
-        setupGlowAndShadow(footMesh);
-        footGroup.add(footMesh);
-
-        shinPivot.add(footGroup);
         legPivot.add(shinPivot);
         group.add(legPivot);
 
@@ -5401,7 +4922,7 @@ function buildEstudanteCasual(isMain, x, z, scaleParam, skinHex, shirtHex, pants
  * mapeando os ossos do esqueleto Mixamo/Standard para o sistema de controle percussivo.
  */
 function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
-    const activeStyle = styleId || state.avatarStyle || 'esqueleto_xbot';
+    const activeStyle = styleId || state.avatarStyle || 'custom';
     const group = new THREE.Group();
     // No modelo GLB realista a base do pé fica em y = 0
     group.position.set(x, 0, z);
@@ -5422,7 +4943,7 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
     // Escala para corresponder à altura dos avatares do palco (~42 unidades)
     const robot = activeStyle === 'robo_expressivo';
     const human = activeStyle === 'professora' || activeStyle === 'aluna';
-    const modelScale = (robot ? 10 : human ? 29 : 23.5) * scaleParam;
+    const modelScale = (robot ? 5 : human ? 29 : 23.5) * scaleParam;
     clonedModel.scale.set(modelScale, modelScale, modelScale);
 
     // Preserva materiais originais (incluindo o clássico esqueleto vermelho/coral do X-Bot)
@@ -5440,7 +4961,6 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         }
     });
 
-    if (template === glbTemplates['soldier.glb']) clonedModel.rotation.y += Math.PI;
     group.add(clonedModel);
 
     const findBone = (regex) => {
@@ -5573,36 +5093,9 @@ function closeAvatarShowcaseModal() {
 
 function selectAvatarStyle(styleId) {
     state.avatarStyle = styleId;
-    if (styleId === 'realista_glb') {
-        state.avatarModel = 'realista';
-        if (glbTemplates['soldier.glb']) {
-            initAvatars();
-            updateAvatarModelUI();
-            renderAvatarShowcaseCards();
-        } else {
-            loadGLBModel('soldier.glb', () => {
-                renderAvatarShowcaseCards();
-                updateAvatarModelUI();
-            });
-        }
-    } else if (styleId === 'esqueleto_xbot') {
-        state.avatarModel = 'realista';
-        if (glbTemplates['xbot.glb']) {
-            initAvatars();
-            updateAvatarModelUI();
-            renderAvatarShowcaseCards();
-        } else {
-            loadGLBModel('xbot.glb', () => {
-                renderAvatarShowcaseCards();
-                updateAvatarModelUI();
-            });
-        }
-    } else {
-        state.avatarModel = 'procedural';
-        initAvatars();
-        updateAvatarModelUI();
-        renderAvatarShowcaseCards();
-    }
+    initAvatars();
+    updateAvatarModelUI();
+    renderAvatarShowcaseCards();
 }
 
 function renderAvatarShowcaseCards() {
@@ -5641,68 +5134,18 @@ function renderAvatarShowcaseCards() {
     }).join('');
 }
 
-function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
-    if (typeof THREE.GLTFLoader === 'undefined') {
-        console.warn('GLTFLoader não disponível');
-        return;
-    }
-    const targetFile = (typeof sourceUrlOrBuffer === 'string') ? sourceUrlOrBuffer : 'custom';
-    if (typeof sourceUrlOrBuffer === 'string' && glbTemplates[targetFile]) {
-        glbTemplate = glbTemplates[targetFile];
-        initAvatars();
-        updateAvatarModelUI();
-        if (onComplete) onComplete(glbTemplates[targetFile]);
-        return;
-    }
-
+function loadCustomAvatar(buffer) {
     glbLoading = true;
     updateAvatarModelUI();
-    const loader = new THREE.GLTFLoader();
-
-    const onSuccess = (gltf) => {
+    new THREE.GLTFLoader().parse(buffer, '', gltf => {
+        customAvatarTemplate = gltf;
         glbLoading = false;
-        glbTemplate = gltf;
-        if (typeof targetFile === 'string') {
-            glbTemplates[targetFile] = gltf;
-        } else {
-            glbTemplates['custom'] = gltf;
-        }
-        updateAvatarModelUI();
-        initAvatars();
-        if (onComplete) onComplete(gltf);
-    };
-
-    const onFail = (err) => {
-        console.warn('Falha ao carregar modelo GLB local:', targetFile, err);
-        // Fallback para URL pública do Three.js com CORS liberado
-        if (typeof targetFile === 'string' && (targetFile === 'soldier.glb' || targetFile === 'xbot.glb')) {
-            const fallbackUrl = (targetFile === 'soldier.glb')
-                ? 'https://threejs.org/examples/models/gltf/Soldier.glb'
-                : 'https://threejs.org/examples/models/gltf/Xbot.glb';
-            loader.load(fallbackUrl, onSuccess, undefined, (fallbackErr) => {
-                console.warn('Fallback online também falhou:', fallbackErr);
-                glbLoading = false;
-                state.avatarStyle = 'boneco_madeira';
-                state.avatarModel = 'procedural';
-                updateAvatarModelUI();
-                initAvatars();
-                if (onError) onError(fallbackErr);
-            });
-            return;
-        }
+        selectAvatarStyle('custom');
+    }, error => {
         glbLoading = false;
-        state.avatarStyle = 'boneco_madeira';
-        state.avatarModel = 'procedural';
         updateAvatarModelUI();
-        initAvatars();
-        if (onError) onError(err);
-    };
-
-    if (sourceUrlOrBuffer instanceof ArrayBuffer) {
-        loader.parse(sourceUrlOrBuffer, '', onSuccess, onFail);
-    } else {
-        loader.load(sourceUrlOrBuffer, onSuccess, undefined, onFail);
-    }
+        console.warn('Falha ao carregar o modelo importado.', error);
+    });
 }
 
 function clearAvatars() {
@@ -5734,9 +5177,7 @@ function initAvatars() {
     const pool = classStyles.map(style => style.id).filter(id => id !== state.avatarStyle);
     const createFn = (style, isMain, x, z, scale, skin, shirt, pants, width = 1) => {
         let template = classTemplates.get(style);
-        if (style === 'realista_glb') template = glbTemplates['soldier.glb'];
-        if (style === 'esqueleto_xbot') template = glbTemplates['xbot.glb'];
-        if (style === 'custom') template = glbTemplates.custom;
+        if (style === 'custom') template = customAvatarTemplate;
         let avatar;
         if (template) {
             avatar = createGLBAvatar(isMain,x,z,scale,template,style);
@@ -5751,7 +5192,8 @@ function initAvatars() {
         avatar.group.scale.z *= Math.sqrt(width);
         avatar.groundY ??= avatar.isGLB ? 0 : 7 * scale;
         avatar.group.position.y = avatar.groundY;
-        addContactShadow(avatar, avatar.isGLB ? 20 * scale : 21);
+        const shadowSize = style === 'robo_expressivo' ? 10 : 20;
+        addContactShadow(avatar, avatar.isGLB ? shadowSize * scale : 21);
         return avatar;
     };
 
