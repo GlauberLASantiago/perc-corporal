@@ -1,30 +1,56 @@
 // Tomadas com a frequência, os canais e a dinâmica das gravações originais.
 const percussionBanks = {
-    'Coxa':   {file:'coxa',   count:14},
-    'Estalo': {file:'estalos',count:23},
-    'Palma':  {file:'palmas', count:15},
-    'Pé':     {file:'pe',     count:16},
-    'Peito':  {file:'peito',  count:18}
+    'Coxa':   {file:'coxa',    count:14, left:'coxa-e',   right:'coxa-d',   originalLevel:1.04, backingLevel:.35},
+    'Estalo': {file:'estalos', count:23, left:'estalo-e', right:'estalo-d', originalLevel:.83,  backingLevel:.45},
+    'Palma':  {file:'palmas',  count:15, left:'palmas',   right:'palmas',   originalLevel:1.04, backingLevel:.20},
+    'Pé':     {file:'pe',      count:16, left:'pe-e',     right:'pe-d',     originalLevel:1.24, backingLevel:.10},
+    'Peito':  {file:'peito',   count:18, left:'peito-e',  right:'peito-d',  originalLevel:1.24, backingLevel:.24}
 };
 
-function loadPercussionBank(context, bank) {
-    if (!bank.loading) {
-        bank.loading = fetch('./amostras/' + bank.file + '.flac')
+const percussionLoads = new Map();
+
+function loadPercussionFile(context, url) {
+    if (!percussionLoads.has(url)) {
+        const loading = fetch(url)
             .then(response => {
-                if (!response.ok) throw new Error('Falha ao carregar ' + bank.file);
+                if (!response.ok) throw new Error('Falha ao carregar ' + url);
                 return response.arrayBuffer();
             })
             .then(bytes => context.decodeAudioData(bytes))
-            .then(buffer => { bank.buffer = buffer; })
-            .catch(error => { bank.loading = null; throw error; });
+            .catch(error => { percussionLoads.delete(url); throw error; });
+        percussionLoads.set(url, loading);
     }
-    return bank.loading;
+    return percussionLoads.get(url);
 }
 
-function playRecordedBeat(context, output, bank, time, pan, ensemble, level = 1) {
+function loadBeatLayers(context, bank, side) {
+    const original = side === 'L' ? bank.left : bank.right;
+    return Promise.all([
+        loadPercussionFile(context, './' + original + '.mp3'),
+        loadPercussionFile(context, './amostras/' + bank.file + '.flac')
+    ]);
+}
+
+function playOriginalBeat(context, output, buffer, time, pan, level) {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    const gain = context.createGain();
+    gain.gain.value = level;
+    source.connect(gain);
+    const panner = context.createStereoPanner?.();
+    if (panner) {
+        panner.pan.value = pan;
+        gain.connect(panner);
+        panner.connect(output);
+    } else gain.connect(output);
+    source.onended = () => { source.disconnect(); gain.disconnect(); panner?.disconnect(); };
+    source.start(time);
+}
+
+function playRecordedBeat(context, output, bank, buffer, time, pan, ensemble, level) {
     const voices = ensemble ? 5 : 1;
     const available = Array.from({length:bank.count}, (_, i) => i);
-    const duration = bank.buffer.duration / bank.count;
+    const duration = buffer.duration / bank.count;
     const positions = [0,-.58,.52,-.32,.68];
     const levels = [.78,.16,.13,.11,.09];
     const start = Math.max(time, context.currentTime);
@@ -45,7 +71,7 @@ function playRecordedBeat(context, output, bank, time, pan, ensemble, level = 1)
             panner.connect(output);
         } else gain.connect(output);
         const source = context.createBufferSource();
-        source.buffer = bank.buffer;
+        source.buffer = buffer;
         source.connect(gain);
         source.onended = () => { source.disconnect(); gain.disconnect(); panner?.disconnect(); };
         source.start(start + delay, take * duration, duration);

@@ -27,7 +27,7 @@ Uma janela flutuante que desenha em tempo real a partitura rítmica corresponden
 
 ### 3. Palco 3D Interativo e Mostruário de Avatares
 
-O botão de tela cheia no canto do palco abre a apresentação. Mova o ponteiro ou toque no palco para exibir os controles de reprodução e saída. No computador, use **W/S** ou **↑/↓** para avançar e recuar e **A/D** ou **←/→** para deslocar a câmera para os lados. Arraste com o mouse para girar a visão.
+O botão de tela cheia no canto do palco abre a apresentação. Mova o ponteiro ou toque no palco para exibir os controles. O botão **♫ Partitura** mostra ou recolhe a partitura na borda inferior do palco, inclusive durante a reprodução. No computador, use **W/S** ou **↑/↓** para avançar e recuar e **A/D** ou **←/→** para deslocar a câmera para os lados. Arraste com o mouse para girar a visão.
 
 A professora guia a turma mista na abertura. No mostruário, qualquer avatar pode assumir a frente. Desmarque **Misturar avatares** para usar o modelo da guia em toda a turma. Alturas e larguras variam entre participantes e se mantêm ao trocar a formação.
 
@@ -40,7 +40,7 @@ A professora e a aluna usam a [base do MakeHuman](https://github.com/makehumanco
     *   **⚡ Esqueleto com Roupa de Exercícios (GLB)**: O manequim esqueleto 3D vestindo roupas de treino: camiseta dry-fit esportiva sobre o tórax, bermuda de corrida com listras atléticas, tênis *running*, *smartwatch* e faixa de suor, mantendo as juntas mecânicas vermelhas visíveis!
     *   **📁 Carregador de Modelos Customizados**: Permite carregar qualquer arquivo `.glb` ou `.gltf` do computador diretamente pela interface do mostruário.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
-*   **Gravações de percussão corporal**. As 86 tomadas estão em FLAC de 24 bits, com a frequência de 44,1 kHz, os canais e os níveis das gravações originais. No solo, uma tomada toca por vez. Na turma, a primeira marca o pulso e outras quatro acompanham de 5 a 23 ms depois, em volume mais baixo.
+*   **Gravações de percussão corporal**. A batida original do aplicativo marca o pulso. Em segundo plano, o aplicativo sorteia entre 86 tomadas em FLAC de 24 bits e 44,1 kHz. No solo, uma tomada acompanha a batida original. Na turma, outras quatro entram com diferenças de 5 a 23 ms.
 
 ### 4. Camada Melódica e Áudio
 *   **Melodia Pentatônica**: Gera uma melodia monofônica paralela para Marimba (escala pentatônica de Dó maior) baseada na rítmica corporal programada.

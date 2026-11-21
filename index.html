@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
     <script src="./body-motion.js"></script>
-    <script src="./percussao.js?v=2"></script>
+    <script src="./percussao.js?v=3"></script>
     <script src="./scenery.js"></script>
     <script src="./class-avatars.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
@@ -94,13 +94,29 @@
             background: #152029dd; color: white; font-size: 18px;
         }
         #stage-tools button:focus-visible { outline: 3px solid #ffc75c; }
-        #stage-tools #stage-play, #stage-tools .exit-icon { display: none; }
+        #stage-tools #stage-play, #stage-tools #stage-score-toggle, #stage-tools .exit-icon { display: none; }
         body.stage-only > :not(#stage-container) { display: none !important; }
         body.stage-only #stage-container {
             position: fixed; inset: 0; width: 100%; height: 100%; min-height: 0;
+            flex-direction: column;
         }
-        body.stage-only #stage-container > :not(#stage-tools):not(#canvas3d) { display: none !important; }
+        body.stage-only #stage-container > :not(#stage-tools):not(#canvas3d):not(#stage-score) { display: none !important; }
+        body.stage-only #canvas3d { flex: 1 1 0; min-height: 0; height: auto; }
+        #stage-score:not([hidden]) {
+            flex: 0 0 auto; width: 100%; background: white;
+            padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        #stage-score #body-score-svg {
+            display: block; width: 100%; height: auto; min-height: 0;
+            max-height: 34vh; max-height: 34dvh;
+            border: 0; border-radius: 0; box-shadow: none;
+        }
         body.stage-only #stage-tools #stage-play { display: grid; }
+        body.stage-only #stage-tools #stage-score-toggle {
+            display: flex; align-items: center; gap: 6px; width: auto; padding: 0 12px;
+            font-size: 14px;
+        }
+        #stage-tools #stage-score-toggle[aria-pressed="true"] { background: white; color: #152029; }
         body.stage-only #stage-tools .enter-icon { display: none; }
         body.stage-only #stage-tools .exit-icon { display: block; }
         body.stage-only #stage-container.tools-idle #stage-tools:not(:has(:focus-visible)) {
@@ -939,6 +955,7 @@
                 </svg>
             </button>
             <button id="stage-play" type="button" title="Reproduzir sequência" aria-label="Reproduzir sequência">▶</button>
+            <button id="stage-score-toggle" type="button" title="Mostrar partitura" aria-pressed="false" aria-controls="stage-score"><span aria-hidden="true">♫</span> Partitura</button>
         </div>
         
         <div id="glossary-panel">
@@ -952,6 +969,7 @@
         </div>
 
         <div id="canvas3d"></div>
+        <aside id="stage-score" aria-label="Partitura do palco" hidden></aside>
     </div>
 
     <div id="main-workspace">
@@ -1834,9 +1852,11 @@ function playPercussionSound(time, side, type, level = 1) {
     if (!audioCtx || !bank) return;
     const pan = type === 'Palma' ? 0 : side === 'L' ? -.4 : .4;
     const ensemble = state.turmaMode;
-    const play = () => playRecordedBeat(audioCtx, audioCtx.destination, bank, time, pan, ensemble, level);
-    if (bank.buffer) play();
-    else loadPercussionBank(audioCtx, bank).then(play).catch(console.error);
+    loadBeatLayers(audioCtx, bank, side).then(([original, backing]) => {
+        const start = Math.max(time, audioCtx.currentTime);
+        playOriginalBeat(audioCtx, audioCtx.destination, original, start, pan, level * bank.originalLevel);
+        playRecordedBeat(audioCtx, audioCtx.destination, bank, backing, start, pan, ensemble, level * bank.backingLevel);
+    }).catch(console.error);
 }
 
 function playMetronome(time, beatIndex) {
@@ -1922,7 +1942,9 @@ async function togglePlayback() {
     document.getElementById('stage-play').disabled = true;
     button.textContent = 'Carregando sons…';
     try {
-        await Promise.all(Object.values(percussionBanks).map(bank => loadPercussionBank(audioCtx, bank)));
+        await Promise.all(Object.values(percussionBanks).flatMap(bank =>
+            ['L', 'R'].map(side => loadBeatLayers(audioCtx, bank, side))
+        ));
         startPlayback();
     } catch (error) {
         console.error(error);
@@ -2089,7 +2111,6 @@ function initUI() {
             scorePanel.style.top = '';
             scorePanel.style.left = '';
             scorePanel.style.margin = '';
-            renderBodyScoreUI(currentStep >= 0 ? currentStep : null);
         }
     }
 
@@ -2104,7 +2125,7 @@ function initUI() {
     }
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && scorePanel && scorePanel.classList.contains('score-window-open')) {
+        if (event.key === 'Escape' && !document.body.classList.contains('stage-only') && scorePanel && scorePanel.classList.contains('score-window-open')) {
             setScoreWindowOpen(false);
         }
     });
@@ -2721,7 +2742,8 @@ function renderBodyScoreUI(activeStep = null) {
     const width = leftPad + rightPad + (state.totalSteps * stepWidth);
     const totalStaffHeight = (scoreBodyRows.length * staffBlockHeight) + ((scoreBodyRows.length - 1) * staffGap);
     const height = topPad + totalStaffHeight + bottomPad;
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    // Reserva espaço para as hastes e bandeirolas acima da primeira pauta.
+    svg.setAttribute('viewBox', `0 -16 ${width} ${height + 16}`);
     svg.innerHTML = '';
 
     const staffMeta = scoreBodyRows.map((row, index) => {
@@ -3200,8 +3222,21 @@ function setupStagePresentation() {
     const stage = document.getElementById('stage-container');
     const toggle = document.getElementById('stage-fullscreen');
     const play = document.getElementById('stage-play');
+    const scoreToggle = document.getElementById('stage-score-toggle');
+    const stageScore = document.getElementById('stage-score');
+    const editorScore = document.getElementById('score-panel');
+    const score = document.getElementById('body-score-svg');
     const nativeStage = () => document.fullscreenElement || document.webkitFullscreenElement;
     let idleTimer;
+
+    function showStageScore(show) {
+        const panel = show ? stageScore : editorScore;
+        if (score.parentElement !== panel) panel.appendChild(score);
+        stageScore.hidden = !show;
+        scoreToggle.setAttribute('aria-pressed', String(show));
+        scoreToggle.title = show ? 'Ocultar partitura' : 'Mostrar partitura';
+    }
+    scoreToggle.addEventListener('click', () => showStageScore(stageScore.hidden));
 
     function revealTools() {
         if (!document.body.classList.contains('stage-only')) return;
@@ -3218,7 +3253,10 @@ function setupStagePresentation() {
         clearTimeout(idleTimer);
         stage.classList.remove('tools-idle');
         if (active) revealTools();
-        else toggle.focus({preventScroll:true});
+        else {
+            showStageScore(false);
+            toggle.focus({preventScroll:true});
+        }
     }
     toggle.addEventListener('click', async () => {
         if (nativeStage() === stage) {
