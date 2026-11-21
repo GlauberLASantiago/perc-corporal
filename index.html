@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
     <script src="./body-motion.js"></script>
-    <script src="./percussao.js"></script>
+    <script src="./percussao.js?v=2"></script>
     <script src="./scenery.js"></script>
     <script src="./class-avatars.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
@@ -89,6 +89,7 @@
         }
         #stage-tools button {
             display: grid; place-items: center; width: 44px; height: 44px;
+            padding: 0;
             border: 1px solid #ffffff59; border-radius: 8px; cursor: pointer;
             background: #152029dd; color: white; font-size: 18px;
         }
@@ -1828,12 +1829,12 @@ function updateTurmaEffects() {
     if (reverbGain) reverbGain.gain.setTargetAtTime(state.turmaMode ? .14 : .10, audioCtx.currentTime, .05);
 }
 
-function playPercussionSound(time, side, type) {
+function playPercussionSound(time, side, type, level = 1) {
     const bank = percussionBanks[type];
     if (!audioCtx || !bank) return;
     const pan = type === 'Palma' ? 0 : side === 'L' ? -.4 : .4;
     const ensemble = state.turmaMode;
-    const play = () => playRecordedBeat(audioCtx, mainMixNode, bank, time, pan, ensemble);
+    const play = () => playRecordedBeat(audioCtx, audioCtx.destination, bank, time, pan, ensemble, level);
     if (bank.buffer) play();
     else loadPercussionBank(audioCtx, bank).then(play).catch(console.error);
 }
@@ -1893,8 +1894,10 @@ function scheduleNote(stepNumber, time) {
     // A melodia é uma camada adicional: deve soar junto com metrônomo e percussão corporal,
     // não substituir os sons corporais.
     playMetronome(time, stepNumber);
-    if (stepData.L) playPercussionSound(time, 'L', stepData.L);
-    if (stepData.R && !(stepData.R === 'Palma' && stepData.L === 'Palma')) playPercussionSound(time, 'R', stepData.R);
+    const right = stepData.R === 'Palma' && stepData.L === 'Palma' ? null : stepData.R;
+    const level = stepData.L && right ? .5 : 1;
+    if (stepData.L) playPercussionSound(time, 'L', stepData.L, level);
+    if (right) playPercussionSound(time, 'R', right, level);
     if (state.melodyOn) scheduleMelodyLayer(stepNumber, time, stepData);
 
     visualQueue.push({ step: stepNumber, time: time, data: stepData });
@@ -2340,8 +2343,8 @@ function setupCellEvents(cell) {
                         state.sequence[col].L = row;
                         state.sequence[col].R = row;
                         initAudio();
-                        playPercussionSound(audioCtx.currentTime, 'L', row);
-                        playPercussionSound(audioCtx.currentTime, 'R', row);
+                        playPercussionSound(audioCtx.currentTime, 'L', row, .5);
+                        playPercussionSound(audioCtx.currentTime, 'R', row, .5);
                         triggerAnimation('L', row);
                         triggerAnimation('R', row);
                     } else {

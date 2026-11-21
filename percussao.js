@@ -1,15 +1,15 @@
-// Cada WAV contém tomadas reais, mono, em trechos de duração igual.
+// Tomadas com a frequência, os canais e a dinâmica das gravações originais.
 const percussionBanks = {
-    'Coxa':   {file:'coxa',   count:14, volume:.96},
-    'Estalo': {file:'estalos',count:23, volume:.89},
-    'Palma':  {file:'palmas', count:15, volume:.90},
-    'Pé':     {file:'pe',     count:16, volume:1.0},
-    'Peito':  {file:'peito',  count:18, volume:.98}
+    'Coxa':   {file:'coxa',   count:14},
+    'Estalo': {file:'estalos',count:23},
+    'Palma':  {file:'palmas', count:15},
+    'Pé':     {file:'pe',     count:16},
+    'Peito':  {file:'peito',  count:18}
 };
 
 function loadPercussionBank(context, bank) {
     if (!bank.loading) {
-        bank.loading = fetch('./amostras/' + bank.file + '.wav')
+        bank.loading = fetch('./amostras/' + bank.file + '.flac')
             .then(response => {
                 if (!response.ok) throw new Error('Falha ao carregar ' + bank.file);
                 return response.arrayBuffer();
@@ -21,12 +21,12 @@ function loadPercussionBank(context, bank) {
     return bank.loading;
 }
 
-function playRecordedBeat(context, output, bank, time, pan, ensemble) {
+function playRecordedBeat(context, output, bank, time, pan, ensemble, level = 1) {
     const voices = ensemble ? 5 : 1;
     const available = Array.from({length:bank.count}, (_, i) => i);
     const duration = bank.buffer.duration / bank.count;
     const positions = [0,-.58,.52,-.32,.68];
-    const levels = [.56,.34,.30,.27,.24];
+    const levels = [.78,.16,.13,.11,.09];
     const start = Math.max(time, context.currentTime);
     for (let i=0; i<voices; i++) {
         // Sorteio sem reposição na batida. A primeira tomada também muda
@@ -37,10 +37,10 @@ function playRecordedBeat(context, output, bank, time, pan, ensemble) {
         if (i === 0) bank.lastLead = take;
         const delay = i === 0 ? 0 : (.005 + (i-1)*.005 + Math.random()*.003);
         const gain = context.createGain();
-        gain.gain.value = bank.volume * (ensemble ? levels[i] * (.93 + Math.random()*.14) : 1);
-        const panner = context.createStereoPanner?.();
+        gain.gain.value = level * (ensemble ? levels[i] : 1);
+        const panner = i > 0 ? context.createStereoPanner?.() : null;
         if (panner) {
-            panner.pan.value = ensemble ? pan*.48+positions[i] : pan;
+            panner.pan.value = pan*.48+positions[i];
             gain.connect(panner);
             panner.connect(output);
         } else gain.connect(output);

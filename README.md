@@ -40,7 +40,7 @@ A professora e a aluna usam a [base do MakeHuman](https://github.com/makehumanco
     *   **⚡ Esqueleto com Roupa de Exercícios (GLB)**: O manequim esqueleto 3D vestindo roupas de treino: camiseta dry-fit esportiva sobre o tórax, bermuda de corrida com listras atléticas, tênis *running*, *smartwatch* e faixa de suor, mantendo as juntas mecânicas vermelhas visíveis!
     *   **📁 Carregador de Modelos Customizados**: Permite carregar qualquer arquivo `.glb` ou `.gltf` do computador diretamente pela interface do mostruário.
 *   **Modo Turma**: Permite alternar a simulação entre modo Solo, Fileiras ou Roda/Círculo.
-*   **Efeito Coletivo**: No modo turma, cinco tomadas diferentes de cada gesto são distribuídas no estéreo. A primeira marca o pulso e as demais entram de 5 a 23 ms depois. No modo solo, as tomadas se alternam a cada toque.
+*   **Gravações de percussão corporal**. As 86 tomadas estão em FLAC de 24 bits, com a frequência de 44,1 kHz, os canais e os níveis das gravações originais. No solo, uma tomada toca por vez. Na turma, a primeira marca o pulso e outras quatro acompanham de 5 a 23 ms depois, em volume mais baixo.
 
 ### 4. Camada Melódica e Áudio
 *   **Melodia Pentatônica**: Gera uma melodia monofônica paralela para Marimba (escala pentatônica de Dó maior) baseada na rítmica corporal programada.
