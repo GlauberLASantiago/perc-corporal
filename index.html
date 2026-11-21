@@ -5165,7 +5165,7 @@ function soleHeight(avatar) {
 function initAvatars() {
     clearAvatars();
 
-    const pool = classStyles.map(style => style.id).filter(id => id !== state.avatarStyle);
+    const pool = AVATAR_STYLES.map(style => style.id).filter(id => id !== state.avatarStyle);
     const repeatable = pool.filter(id => id !== 'professora' && id !== 'aluna');
     const soleOffsets = new Map();
     const createFn = (style, isMain, x, z, scale, skin, shirt, pants, width = 1) => {
