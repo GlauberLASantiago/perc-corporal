@@ -4975,11 +4975,13 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
     if (template.animations && template.animations.length > 0) {
         mixer = new THREE.AnimationMixer(clonedModel);
         const findClip = (pattern) => template.animations.find(a => pattern.test(a.name));
-        const idleClip = findClip(/idle/i) || template.animations[0];
+        const idleClip = findClip(/idle|standing|rest/i);
         if (idleClip) {
             const idleAction = mixer.clipAction(idleClip);
+            idleAction.paused = true;
             idleAction.play();
             actions.idle = idleAction;
+            mixer.update(0);
         }
         const walkClip = findClip(/walk/i);
         if (walkClip) {
@@ -5031,7 +5033,8 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
                 pinky:robotNode('Ring1'+side),foot:robotNode('Foot'+side)});
         }
     }
-    return { group, parts, isMain, isGLB:true, mixer, actions, torso:human ? findBone(/^spine$/i) : null };
+    const torso = robot ? robotNode('Torso') : human ? findBone(/^spine$/i) : null;
+    return { group, parts, isMain, isGLB:true, mixer, actions, torso };
 }
 
 function updateAvatarModelUI() {
@@ -5138,11 +5141,33 @@ function clearAvatars() {
     }
 }
 
+// Mede o ponto de apoio na pose inicial. Nos GLBs com pele, o vértice
+// precisa passar pelos ossos antes de sua altura ser medida no palco.
+function soleHeight(avatar) {
+    avatar.group.updateMatrixWorld(true);
+    const point = new THREE.Vector3();
+    let lowest = Infinity;
+    const feet = Object.values(avatar.parts).map(part => part.meshes['Pé']);
+    const roots = feet.every(Boolean) ? feet : [avatar.group];
+    for (const root of roots) root.traverseVisible(mesh => {
+        if (!mesh.isMesh || mesh.isInstancedMesh) return;
+        const positions = mesh.geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+            point.fromBufferAttribute(positions, i);
+            if (mesh.isSkinnedMesh) mesh.boneTransform(i, point);
+            point.applyMatrix4(mesh.matrixWorld);
+            lowest = Math.min(lowest, point.y);
+        }
+    });
+    return Number.isFinite(lowest) ? lowest : 0;
+}
+
 function initAvatars() {
     clearAvatars();
 
     const pool = classStyles.map(style => style.id).filter(id => id !== state.avatarStyle);
     const repeatable = pool.filter(id => id !== 'professora' && id !== 'aluna');
+    const soleOffsets = new Map();
     const createFn = (style, isMain, x, z, scale, skin, shirt, pants, width = 1) => {
         let template = classTemplates.get(style);
         if (style === 'custom') template = customAvatarTemplate;
@@ -5158,8 +5183,14 @@ function initAvatars() {
         avatar.style = style;
         avatar.group.scale.x *= width;
         avatar.group.scale.z *= Math.sqrt(width);
-        avatar.groundY ??= avatar.isGLB ? 0 : 7 * scale;
+        avatar.group.position.y = 0;
+        if (!soleOffsets.has(style)) soleOffsets.set(style, -soleHeight(avatar) / scale);
+        avatar.groundY = soleOffsets.get(style) * scale;
         avatar.group.position.y = avatar.groundY;
+        if (avatar.torso) avatar.restTorso = avatar.torso.rotation.clone();
+        const seat = allAvatars.length;
+        avatar.restTiming = {period:7600 + (seat * 607) % 2400,
+            offset:(seat * 2311 + 3400) % 9200, side:seat % 2 ? -1 : 1};
         const shadowSize = style === 'robo_expressivo' ? 10 : 20;
         addContactShadow(avatar, avatar.isGLB ? shadowSize * scale : 21);
         return avatar;
@@ -5406,12 +5437,12 @@ function animate3D() {
         // Atualização do AnimationMixer (Idle/Walk suave e realista para modelos GLB)
         BodyMotion.restore(avatar.parts.L);
         BodyMotion.restore(avatar.parts.R);
-        BodyMotion.lean(avatar, now, delta);
+        BodyMotion.lean(avatar, now, delta, walkingIntensity);
         if (avatar.mixer) {
-            if (avatar.actions && avatar.actions.walk && avatar.actions.idle) {
+            if (avatar.actions.walk) {
                 const walkWeight = Math.min(1.0, walkingIntensity * 1.6);
                 avatar.actions.walk.setEffectiveWeight(walkWeight);
-                avatar.actions.idle.setEffectiveWeight(1.0 - walkWeight);
+                avatar.actions.idle?.setEffectiveWeight(1.0 - walkWeight);
                 if (walkWeight > 0.05 && !avatar.actions.walk.isRunning()) {
                     avatar.actions.walk.play();
                 }
@@ -5420,22 +5451,6 @@ function animate3D() {
         }
 
         const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
-        const baseHeight = avatar.groundY;
-        const walkLift = walkingIntensity * 0.2;
-        const walkBounce = Math.abs(Math.cos(walkClock + clonePhaseOffset)) * 0.5 * walkingIntensity;
-
-        // Bob de reprodução e elevação natural ao caminhar
-        if (state.isPlaying) {
-            const t = Date.now() * 0.005;
-            const offset = avatar.group.position.x * 0.1; 
-            const bob = Math.sin(t + offset) * 0.4;
-            avatar.group.position.y = baseHeight + bob + walkLift + walkBounce;
-        } else {
-            const targetRestY = baseHeight + walkLift + walkBounce;
-            avatar.group.position.y += (targetRestY - avatar.group.position.y) * 0.1;
-        }
-        avatar.contactShadow.position.y = (.12-avatar.group.position.y)/avatar.group.scale.y;
-
         ['L', 'R'].forEach(side => {
             const sign = avatar.isGLB ? (side === 'L' ? -1 : 1) : (side === 'L' ? 1 : -1);
             

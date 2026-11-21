@@ -60,10 +60,21 @@ const BodyMotion = (() => {
         }
     }
 
-    function lean(avatar, now, delta) {
+    function lean(avatar, now, delta, walking = 0) {
         const torso = avatar.torso;
         if (!torso) return;
         let forward = 0, lateral = 0;
+        const atRest = walking < .01 && Object.values(avatar.parts).every(part =>
+            !part.stroke && !part.armPivot?.userData.isAnimating && !part.legPivot?.userData.isAnimating);
+        if (atRest && avatar.restTiming) {
+            const {period, offset, side} = avatar.restTiming;
+            const phase = (now + offset) % period;
+            if (phase < 2100) {
+                const shift = Math.sin(Math.PI * phase / 2100) ** 2;
+                forward = .012 * shift;
+                lateral = side * .018 * shift;
+            }
+        }
         for (const side of ['L', 'R']) {
             const stroke = avatar.parts[side].stroke;
             if (!stroke) continue;
@@ -74,8 +85,8 @@ const BodyMotion = (() => {
             if (stroke.type === 'Coxa') lateral += (side === 'L' ? -1 : 1) * .12 * w;
         }
         const k = 1 - Math.exp(-28 * delta);
-        torso.rotation.x += (forward - torso.rotation.x) * k;
-        torso.rotation.z += (lateral - torso.rotation.z) * k;
+        torso.rotation.x += (avatar.restTorso.x + forward - torso.rotation.x) * k;
+        torso.rotation.z += (avatar.restTorso.z + lateral - torso.rotation.z) * k;
     }
 
     function restore(p) {

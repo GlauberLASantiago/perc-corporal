@@ -73,7 +73,6 @@ function addContactShadow(avatar, size) {
     footprint.position.y=(.12-avatar.groundY)/avatar.group.scale.y;
     footprint.userData.ownedGeometry=true;
     avatar.group.add(footprint);
-    avatar.contactShadow=footprint;
 }
 
 function buildCartoon(style, isMain, x, z, scale) {
