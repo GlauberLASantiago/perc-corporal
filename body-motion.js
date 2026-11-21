@@ -86,6 +86,15 @@ const BodyMotion = (() => {
     function pose(avatar, side, now) {
         const p = avatar.parts[side], stroke = p.stroke;
         if (!stroke) return;
+        // Calcule o alcance no espaço do corpo, antes da variação de largura.
+        const scale = avatar.group.scale;
+        const sx = scale.x, sz = scale.z;
+        scale.x = scale.z = scale.y;
+        try { solve(avatar, side, now, p, stroke); }
+        finally { scale.x = sx; scale.z = sz; }
+    }
+
+    function solve(avatar, side, now, p, stroke) {
         const {type, joints, start, impact} = stroke;
         const [arm, elbow, wrist] = joints;
         stroke.base = joints.map(joint => joint.quaternion.clone());
@@ -112,6 +121,7 @@ const BodyMotion = (() => {
             contact = center.addScaledVector(outward, .16 * width).addScaledVector(up, -.23 * width)
                 .addScaledVector(front, .27 * width);
             const pad = p.meshes.Peito;
+            if (p.chestContact) contact.copy(pos(p.chestContact));
             if (!avatar.isGLB && pad?.geometry) {
                 if (!pad.geometry.boundingBox) pad.geometry.computeBoundingBox();
                 pad.updateWorldMatrix(true, false);
@@ -124,6 +134,7 @@ const BodyMotion = (() => {
         } else {
             contact = pos(p.legPivot).lerp(pos(p.shinPivot), .24)
                 .addScaledVector(front, width * .15).addScaledVector(outward, width * .055);
+            if (p.thighContact) contact.copy(pos(p.thighContact));
             fingers = frame(-.20, -.98, 0);
             normal = front.clone().negate();
         }
@@ -136,7 +147,7 @@ const BodyMotion = (() => {
         if (p.middle && p.index && p.pinky) {
             const middle = wrist.worldToLocal(pos(p.middle));
             const across = wrist.worldToLocal(pos(p.index)).sub(wrist.worldToLocal(pos(p.pinky)));
-            const palmNormal = middle.clone().cross(across).multiplyScalar(side === 'R' ? 1 : -1);
+            const palmNormal = middle.clone().cross(across).multiplyScalar(side === 'L' ? 1 : -1);
             localFrame = handFrame(middle, palmNormal);
             palmLength = pos(p.middle).distanceTo(pos(wrist)) * .58;
         }
@@ -169,7 +180,7 @@ const BodyMotion = (() => {
 function setupStageSettings(scene, floor, grid, light) {
     const themes = {
         studio: [0x2a1f1a, 0x3d271d], theatre: [0x1d1423, 0x543927],
-        dance: [0xc8d8d7, 0xc09267], park: [0xb9d9e6, 0x9ca48a]
+        dance: [0x42302b, 0x79674f], park: [0x89979b, 0x666766]
     };
     const sets = new Map();
     function scenery(name) {
@@ -187,23 +198,11 @@ function setupStageSettings(scene, floor, grid, light) {
                 prop(fold, i % 2 ? 0x701b36 : 0x9b2945, side * (55 + i * 9), 50, -151);
             }
         } else if (name === 'dance') {
-            prop(new THREE.BoxGeometry(360, 85, 2), 0xdde5df, 0, 42, -158);
-            for (let i = -3; i <= 3; i++) {
-                prop(new THREE.BoxGeometry(45, 46, 1), 0x9ebcbe, i * 48, 41, -156);
-                prop(new THREE.BoxGeometry(1.8, 26, 4), 0x4c5859, i * 48, 13, -150);
-            }
-            prop(new THREE.BoxGeometry(325, 2.3, 2.3), 0x925c3b, 0, 27, -150);
+            buildBallroom(prop);
         } else if (name === 'park') {
-            for (const [x,z,h] of [[-77,-68,29],[89,-86,33],[-48,-156,26],[25,-177,36],[108,-152,28]]) {
-                prop(new THREE.CylinderGeometry(2, 3, h, 10), 0x785740, x, h/2, z);
-                prop(new THREE.IcosahedronGeometry(17, 1), 0x5f895e, x, h+7, z);
-            }
-            for (const x of [-58, 65]) {
-                prop(new THREE.BoxGeometry(27, 2, 7), 0x906b4d, x, 7, -110);
-                prop(new THREE.BoxGeometry(27, 7, 1.5), 0x906b4d, x, 12, -113);
-                for (const dx of [-10, 10]) prop(new THREE.BoxGeometry(2, 7, 6), 0x526061, x+dx, 3.5, -110);
-            }
+            buildCityPlaza(prop);
         }
+        if (name === 'dance' || name === 'park') group.userData.floorMap = plazaOrParquet(name === 'park');
         scene.add(group);
         return group;
     }
@@ -214,8 +213,14 @@ function setupStageSettings(scene, floor, grid, light) {
         sets.get(name).visible = true;
         scene.background.setHex(themes[name][0]);
         scene.fog.color.copy(scene.background);
+        scene.fog.near = name === 'park' || name === 'dance' ? 160 : 100;
+        scene.fog.far = name === 'park' || name === 'dance' ? 560 : 400;
+        floor.map = sets.get(name).userData.floorMap || null;
+        floor.roughness = name === 'park' ? .95 : name === 'dance' ? .77 : .45;
+        floor.metalness = floor.map ? 0 : .1;
+        floor.needsUpdate = true;
         floor.color.setHex(themes[name][1]);
         grid.visible = name === 'studio';
-        light.intensity = name === 'park' || name === 'dance' ? .85 : .4;
+        light.intensity = name === 'park' ? .54 : .4;
     });
 }

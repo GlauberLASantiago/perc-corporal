@@ -11,6 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
     <script src="./body-motion.js"></script>
+    <script src="./scenery.js"></script>
+    <script src="./class-avatars.js"></script>
     <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
@@ -574,6 +576,7 @@
         .showcase-card.active .showcase-icon-box {
             background: #dcfce7;
         }
+        .showcase-portrait {width:100%;height:126px;object-fit:contain;background:#e3ded4;border-radius:10px;margin-bottom:12px}
         .showcase-btn-select {
             margin-top: 14px;
             padding: 9px 14px;
@@ -1034,10 +1037,11 @@
         <input type="file" id="glb-file-input" accept=".glb,.gltf" style="display:none;">
         <label for="stage-setting">Cenário</label>
         <select id="stage-setting">
-            <option value="studio">Estúdio</option><option value="dance">Sala de dança</option>
+            <option value="studio">Estúdio</option><option value="dance">Salão de baile</option>
             <option value="theatre">Teatro</option><option value="park">Praça</option>
         </select>
 
+        <label class="mix-control"><input type="checkbox" id="mix-class" checked> Misturar avatares</label>
         <button id="turma-btn" style="background: #9b59b6; color:white;" title="Alternar turma: OFF, Fileiras ou Roda">👥 Turma: OFF</button>
         <button id="melody-btn" type="button" style="background: #795548; color:white;" title="Gerar melodia monofônica de marimba baseada na rítmica geral">🎵 Melodia: OFF</button>
         <select id="melody-scale-select" title="Escolher escala da melodia" style="background: #795548; color: white; border: 1px solid #5d4037; border-radius: 8px; padding: 4px 8px; font-size: 0.85em; display: none; height: 32px; vertical-align: middle; margin-left: 4px; font-family: inherit; font-weight: bold; cursor: pointer;">
@@ -1078,7 +1082,7 @@
             <div style="background: linear-gradient(135deg, #2c3e50, #1a252f); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h2 style="margin: 0; font-size: 1.35em; display: flex; align-items: center; gap: 8px;">🎭 Mostruário de Avatares 3D</h2>
-                    <p style="margin: 4px 0 0; font-size: 0.85em; color: #cbd5e1;">Escolha o visual que mais combina com a sua prática ou carregue seu próprio arquivo 3D</p>
+                    <p style="margin: 4px 0 0; font-size: 0.85em; color: #cbd5e1;">Escolha quem guia a atividade ou carregue seu próprio arquivo 3D.</p>
                 </div>
                 <button id="showcase-close-btn" style="background: rgba(255,255,255,0.15); border: none; color: white; font-size: 1.25em; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" title="Fechar">✕</button>
             </div>
@@ -1107,11 +1111,12 @@ const state = {
     sequence: Array.from({ length: 32 }, () => ({ L: null, R: null, Pos: null, Move: null })),
     selectedTool: null, draggedData: null,
     sequencerMode: 'lateral',
-    avatarStyle: 'estudante',
+    avatarStyle: 'professora', mixedClass: true,
     avatarModel: 'procedural' // 'procedural' ou 'realista' (GLB)
 };
 
 const AVATAR_STYLES = [
+    ...classStyles,
     {
         id: 'boneco_madeira',
         icon: '🎨',
@@ -2256,8 +2261,9 @@ function initUI() {
             const reader = new FileReader();
             reader.onload = (evt) => {
                 loadGLBModel(evt.target.result, () => {
-                    state.avatarStyle = 'realista_glb';
+                    state.avatarStyle = 'custom';
                     state.avatarModel = 'realista';
+                    initAvatars();
                     renderAvatarShowcaseCards();
                     updateAvatarModelUI();
                 });
@@ -2273,6 +2279,10 @@ function initUI() {
         });
     }
 
+    document.getElementById('mix-class').addEventListener('change', event => {
+        state.mixedClass = event.target.checked;
+        initAvatars();
+    });
     const turmaBtn = document.getElementById('turma-btn');
     turmaBtn.addEventListener('click', () => {
         const nextLayout = state.turmaLayout === 'off' ? 'fileiras' : (state.turmaLayout === 'fileiras' ? 'roda' : 'off');
@@ -3291,11 +3301,7 @@ function initThreeJS() {
     scene.add(gridHelper);
     setupStageSettings(scene, floorMaterial, gridHelper, hemiLight);
 
-    initAvatars();
-    if (state.avatarModel === 'realista') {
-        const glbFile = (state.avatarStyle === 'realista_glb') ? 'soldier.glb' : 'xbot.glb';
-        loadGLBModel(glbFile);
-    }
+    loadClassModels().then(initAvatars);
 
     window.addEventListener('resize', () => {
         camera.aspect = container.clientWidth / container.clientHeight;
@@ -5414,7 +5420,9 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         : template.scene.clone();
 
     // Escala para corresponder à altura dos avatares do palco (~42 unidades)
-    const modelScale = 23.5 * scaleParam;
+    const robot = activeStyle === 'robo_expressivo';
+    const human = activeStyle === 'professora' || activeStyle === 'aluna';
+    const modelScale = (robot ? 10 : human ? 29 : 23.5) * scaleParam;
     clonedModel.scale.set(modelScale, modelScale, modelScale);
 
     // Preserva materiais originais (incluindo o clássico esqueleto vermelho/coral do X-Bot)
@@ -5424,6 +5432,10 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
             child.receiveShadow = true;
             if (child.material) {
                 child.material = child.material.clone();
+                if (human && child.material.map) {
+                    // O palco usa a saída linear do Three r128 para as cores dos avatares.
+                    child.material.map.encoding = THREE.LinearEncoding;
+                }
             }
         }
     });
@@ -5450,14 +5462,19 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         return bone;
     };
 
-    const armPivotL = initBone(findBone(/leftarm$/i));
-    const armPivotR = initBone(findBone(/rightarm$/i));
-    const forearmPivotL = initBone(findBone(/leftforearm$/i));
-    const forearmPivotR = initBone(findBone(/rightforearm$/i));
-    const legPivotL = initBone(findBone(/leftupleg$/i));
-    const legPivotR = initBone(findBone(/rightupleg$/i));
-    const shinPivotL = initBone(findBone(/leftleg$/i));
-    const shinPivotR = initBone(findBone(/rightleg$/i));
+    const robotNode = name => clonedModel.getObjectByName(name);
+    function limb(side, key, robotKey) {
+        const full = (side === 'L' ? 'left' : 'right') + key;
+        return robot ? robotNode(robotKey + side) : findBone(new RegExp(full + '$', 'i'));
+    }
+    const armPivotL = initBone(limb('L','arm','UpperArm'));
+    const armPivotR = initBone(limb('R','arm','UpperArm'));
+    const forearmPivotL = initBone(limb('L','forearm','LowerArm'));
+    const forearmPivotR = initBone(limb('R','forearm','LowerArm'));
+    const legPivotL = initBone(limb('L','upleg','UpperLeg'));
+    const legPivotR = initBone(limb('R','upleg','UpperLeg'));
+    const shinPivotL = initBone(limb('L','leg','LowerLeg'));
+    const shinPivotR = initBone(limb('R','leg','LowerLeg'));
 
     // Suporte ao AnimationMixer: busca insensível a maiúsculas/minúsculas para Idle e Walk
     let mixer = null;
@@ -5507,13 +5524,33 @@ function createGLBAvatar(isMain, x, z, scaleParam, template, styleId) {
         }
     };
 
-    return { group, parts, isMain, isGLB: true, mixer, actions, id: Math.random().toString(36).substring(7) };
+    if (human) addCurlyHair(findBone(/^head$/i), activeStyle === 'aluna');
+    for (const side of ['L','R']) {
+        const part = parts[side], sign = side === 'L' ? 1 : -1;
+        if (human) {
+            part.chestContact = clonedModel.getObjectByName('TouchChest'+side);
+            part.thighContact = clonedModel.getObjectByName('TouchThigh'+side);
+            part.armPivot.rotation.z -= sign * .56;
+            part.armPivot.userData.restingRot.copy(part.armPivot.rotation);
+        }
+        if (robot) {
+            // The source model has a separate palm bone for each finger.
+            const wrist = new THREE.Group();
+            const palm = robotNode('Palm2' + side);
+            wrist.position.copy(palm.position);
+            part.forearmPivot.add(wrist);
+            for (const name of ['Palm1','Palm2','Palm3','Thumb']) wrist.attach(robotNode(name + side));
+            Object.assign(part,{wrist, middle:robotNode('Middle1'+side),index:robotNode('Index'+side),
+                pinky:robotNode('Ring1'+side),foot:robotNode('Foot'+side)});
+        }
+    }
+    return { group, parts, isMain, isGLB:true, mixer, actions, torso:human ? findBone(/^spine$/i) : null };
 }
 
 function updateAvatarModelUI() {
     const btn = document.getElementById('avatar-showcase-btn');
     if (!btn) return;
-    const currentStyle = AVATAR_STYLES.find(s => s.id === state.avatarStyle) || AVATAR_STYLES[0];
+    const currentStyle = state.avatarStyle === 'custom' ? {icon:'🎭', name:'Importado'} : AVATAR_STYLES.find(s => s.id === state.avatarStyle) || AVATAR_STYLES[0];
     if (glbLoading) {
         btn.textContent = '⏳ Carregando 3D...';
         btn.style.background = '#f39c12';
@@ -5575,7 +5612,7 @@ function renderAvatarShowcaseCards() {
     container.innerHTML = AVATAR_STYLES.map(style => {
         const isActive = (state.avatarStyle === style.id);
         const activeClass = isActive ? 'active' : '';
-        const btnText = isActive ? '✓ Em Uso no Palco' : 'Escolher este Modelo';
+        const btnText = isActive ? '✓ Guia da turma' : 'Escolher como guia';
         const btnBg = isActive ? '#27ae60' : '#3b82f6';
 
         const featuresHtml = style.features.map(f => `<span style="display:inline-block; background:rgba(0,0,0,0.05); padding:2px 7px; border-radius:5px; font-size:0.75em; margin: 2px 2px; color: #475569;">• ${f}</span>`).join('');
@@ -5583,9 +5620,11 @@ function renderAvatarShowcaseCards() {
         return `
             <div class="showcase-card ${activeClass}" onclick="selectAvatarStyle('${style.id}')">
                 <span class="showcase-badge" style="background: ${style.badgeColor};">${style.badge}</span>
-                <div class="showcase-icon-box">
+                ${classStyles.some(item => item.id === style.id)
+                    ? `<img class="showcase-portrait" src="./retratos/${style.id}.webp" alt="" loading="lazy">`
+                    : `<div class="showcase-icon-box">
                     <span>${style.icon}</span>
-                </div>
+                </div>`}
                 <div>
                     <h3 style="margin: 0 0 4px; font-size: 1.1em; color: #1e293b;">${style.name}</h3>
                     <div style="font-size: 0.8em; color: #64748b; font-weight: 600; margin-bottom: 8px;">${style.subtitle}</div>
@@ -5607,7 +5646,7 @@ function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
         console.warn('GLTFLoader não disponível');
         return;
     }
-    const targetFile = (typeof sourceUrlOrBuffer === 'string') ? sourceUrlOrBuffer : 'xbot.glb';
+    const targetFile = (typeof sourceUrlOrBuffer === 'string') ? sourceUrlOrBuffer : 'custom';
     if (typeof sourceUrlOrBuffer === 'string' && glbTemplates[targetFile]) {
         glbTemplate = glbTemplates[targetFile];
         initAvatars();
@@ -5668,9 +5707,23 @@ function loadGLBModel(sourceUrlOrBuffer, onComplete, onError) {
 
 function clearAvatars() {
     if (allAvatars && allAvatars.length > 0) {
+        const geometries = new Set(), materials = new Set();
         allAvatars.forEach(a => {
             if (a.group && scene) scene.remove(a.group);
+            if (a.mixer) {
+                a.mixer.stopAllAction();
+                a.mixer.uncacheRoot(a.mixer.getRoot());
+            }
+            a.group.traverse(node => {
+                if (!node.isMesh) return;
+                if (!a.isGLB || node.isInstancedMesh || node.userData.ownedGeometry) geometries.add(node.geometry);
+                for (const material of [].concat(node.material)) materials.add(material);
+                if (node.isInstancedMesh) node.dispose?.();
+                if (node.isSkinnedMesh) node.skeleton.dispose?.();
+            });
         });
+        geometries.forEach(geometry => geometry.dispose());
+        materials.forEach(material => material.dispose());
         allAvatars = [];
     }
 }
@@ -5678,25 +5731,31 @@ function clearAvatars() {
 function initAvatars() {
     clearAvatars();
 
-    const isGLBStyle = (
-        state.avatarStyle === 'realista_glb' ||
-        state.avatarStyle === 'esqueleto_xbot'
-    );
-    const glbTargetFile = (state.avatarStyle === 'realista_glb') ? 'soldier.glb' : 'xbot.glb';
-    const activeTemplate = glbTemplates[glbTargetFile] || glbTemplates['custom'] || glbTemplate;
-    const isUsingGLB = (isGLBStyle && state.avatarModel === 'realista' && activeTemplate);
-
-    const createFn = (isMain, x, z, scale, skin, shirt, pants) => {
-        if (isUsingGLB) {
-            return createGLBAvatar(isMain, x, z, scale, activeTemplate, state.avatarStyle);
+    const pool = classStyles.map(style => style.id).filter(id => id !== state.avatarStyle);
+    const createFn = (style, isMain, x, z, scale, skin, shirt, pants, width = 1) => {
+        let template = classTemplates.get(style);
+        if (style === 'realista_glb') template = glbTemplates['soldier.glb'];
+        if (style === 'esqueleto_xbot') template = glbTemplates['xbot.glb'];
+        if (style === 'custom') template = glbTemplates.custom;
+        let avatar;
+        if (template) {
+            avatar = createGLBAvatar(isMain,x,z,scale,template,style);
         } else {
-            const avatar = createSingleAvatar(state.avatarStyle || 'estudante', isMain, x, z, scale, skin, shirt, pants);
+            avatar = ['capivara','menino'].includes(style)
+                ? buildCartoon(style,isMain,x,z,scale)
+                : createSingleAvatar(style,isMain,x,z,scale,skin,shirt,pants);
             BodyMotion.prepareTorso(avatar);
-            return avatar;
         }
+        avatar.style = style;
+        avatar.group.scale.x *= width;
+        avatar.group.scale.z *= Math.sqrt(width);
+        avatar.groundY ??= avatar.isGLB ? 0 : 7 * scale;
+        avatar.group.position.y = avatar.groundY;
+        addContactShadow(avatar, avatar.isGLB ? 20 * scale : 21);
+        return avatar;
     };
 
-    const mainAvatar = createFn(true, 0, 0, 1.0, 0xffccaa, 0x2c3e50, 0x1d2d44);
+    const mainAvatar = createFn(state.avatarStyle,true,0,0,1,0xffccaa,0x2c3e50,0x1d2d44);
     mainAvatar.group.userData.fileBaseX = 0;
     mainAvatar.group.userData.fileBaseZ = 0;
     mainAvatar.group.userData.fileBaseRotY = 0;
@@ -5720,11 +5779,12 @@ function initAvatars() {
         for (let i = 0; i < row.count; i++) {
             const x = (i * row.spacing) - (rowWidth / 2) + stagger;
             const z = row.z;
-            const scale = row.scaleBase + (Math.random() * 0.08 - 0.04);
-            const skin  = skinColors[Math.floor(Math.random() * skinColors.length)];
-            const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
-            const pants = pantsColors[Math.floor(Math.random() * pantsColors.length)];
-            const clone = createFn(false, x, z, scale, skin, shirt, pants);
+            const slot = allAvatars.length - 1;
+            const member = classMember(slot);
+            const style = state.mixedClass ? pool[slot % pool.length] : state.avatarStyle;
+            const palette = (list, value) => list[Math.floor(value * list.length)];
+            const clone = createFn(style,false,x,z,member.height,palette(skinColors,member.skin),
+                palette(shirtColors,member.shirt),palette(pantsColors,member.pants),member.width);
             clone.group.visible = false;
             clone.group.userData.formationRow = rowIndex + 1;
             clone.group.userData.formationCol = i + 1;
@@ -5768,6 +5828,7 @@ function applyAvatarBaseTransform(avatar, x, z, rotY) {
 
 function setTurmaLayout(layout) {
     state.turmaLayout = layout;
+    document.getElementById('mix-class').disabled = layout === 'off';
     state.turmaMode = layout !== 'off';
 
     allAvatars.forEach(avatar => {
@@ -5959,7 +6020,7 @@ function animate3D() {
         }
 
         const clonePhaseOffset = ((avatar.group.userData.formationRow || 0) * 0.18) + ((avatar.group.userData.formationCol || 0) * 0.07);
-        const baseHeight = avatar.isGLB ? 0.0 : 7.0;
+        const baseHeight = avatar.groundY;
         const walkLift = walkingIntensity * 0.2;
         const walkBounce = Math.abs(Math.cos(walkClock + clonePhaseOffset)) * 0.5 * walkingIntensity;
 
@@ -5973,6 +6034,7 @@ function animate3D() {
             const targetRestY = baseHeight + walkLift + walkBounce;
             avatar.group.position.y += (targetRestY - avatar.group.position.y) * 0.1;
         }
+        avatar.contactShadow.position.y = (.12-avatar.group.position.y)/avatar.group.scale.y;
 
         ['L', 'R'].forEach(side => {
             const sign = avatar.isGLB ? (side === 'L' ? -1 : 1) : (side === 'L' ? 1 : -1);
