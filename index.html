@@ -5142,6 +5142,7 @@ function initAvatars() {
     clearAvatars();
 
     const pool = classStyles.map(style => style.id).filter(id => id !== state.avatarStyle);
+    const repeatable = pool.filter(id => id !== 'professora' && id !== 'aluna');
     const createFn = (style, isMain, x, z, scale, skin, shirt, pants, width = 1) => {
         let template = classTemplates.get(style);
         if (style === 'custom') template = customAvatarTemplate;
@@ -5190,7 +5191,10 @@ function initAvatars() {
             const z = row.z;
             const slot = allAvatars.length - 1;
             const member = classMember(slot);
-            const style = state.mixedClass ? pool[slot % pool.length] : state.avatarStyle;
+            let style = state.avatarStyle;
+            if (state.mixedClass) {
+                style = slot < pool.length ? pool[slot] : repeatable[(slot - pool.length) % repeatable.length];
+            }
             const palette = (list, value) => list[Math.floor(value * list.length)];
             const clone = createFn(style,false,x,z,member.height,palette(skinColors,member.skin),
                 palette(shirtColors,member.shirt),palette(pantsColors,member.pants),member.width);
