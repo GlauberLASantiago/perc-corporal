@@ -126,3 +126,86 @@ function buildCityPlaza(prop) {
         for(const dx of [-5,5])prop(new THREE.BoxGeometry(1.2,3.5,3.6),0x4d5351,x+dx,1.7,-215);
     }
 }
+function schoolCourtFloor() {
+    const canvas=document.createElement('canvas');
+    canvas.width=canvas.height=1024;
+    const c=canvas.getContext('2d');
+    c.fillStyle='#b99e83';c.fillRect(0,0,1024,1024);
+    c.fillStyle='#b07557';c.fillRect(54,110,916,715);
+    c.fillStyle='#668d83';c.fillRect(96,150,832,632);
+    c.strokeStyle='#e7d9b3';c.lineWidth=4;
+    c.strokeRect(96,150,832,632);
+    c.beginPath();c.moveTo(512,150);c.lineTo(512,782);c.stroke();
+    c.beginPath();c.arc(512,466,83,0,Math.PI*2);c.stroke();
+    for (const right of [false,true]) {
+        c.save();c.translate(right?928:96,466);if(right)c.scale(-1,1);
+        c.beginPath();c.arc(0,0,149,-Math.PI/2,Math.PI/2);c.stroke();
+        c.strokeRect(0,-88,72,176);c.restore();
+    }
+    // Amarelinha pintada no passeio lateral do pátio.
+    c.font='bold 20px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineWidth=2;
+    let number=1;
+    for(const [row,count] of [1,2,1,2,1,2,1].entries()) {
+        for(let i=0;i<count;i++) {
+            const x=512+(i-count/2)*36,y=1000-row*25;
+            c.fillStyle=['#d7a654','#789d99','#c37d66'][row%3];c.fillRect(x,y-25,36,25);
+            c.strokeRect(x,y-25,36,25);c.fillStyle='#403e3a';c.fillText(String(number++),x+18,y-12);
+        }
+    }
+    const tex=new THREE.CanvasTexture(canvas);tex.anisotropy=8;return tex;
+}
+
+function buildSchoolCourtyard(prop) {
+    // Salas de aula com faixa de azulejos, janelas basculantes e varanda.
+    const canvas=document.createElement('canvas');canvas.width=2048;canvas.height=288;
+    const c=canvas.getContext('2d');
+    c.fillStyle='#eddbb8';c.fillRect(0,0,2048,288);
+    c.fillStyle='#568b91';c.fillRect(0,174,2048,114);
+    c.strokeStyle='#9db6ad';c.lineWidth=1;
+    c.beginPath();
+    for(let x=0;x<=2048;x+=22){c.moveTo(x,174);c.lineTo(x,288);}
+    for(let y=174;y<288;y+=22){c.moveTo(0,y);c.lineTo(2048,y);}
+    c.stroke();
+    for(let i=0;i<4;i++) {
+        const x=i*512;
+        c.fillStyle='#6e6858';c.fillRect(x+26,74,98,214);
+        c.fillStyle='#35636a';c.fillRect(x+31,79,88,209);
+        c.fillStyle='#97b9bc';c.fillRect(x+47,99,54,68);
+        c.fillStyle='#d6c598';c.fillRect(x+101,186,12,4);
+        c.fillStyle='#345459';c.fillRect(x+33,43,83,24);
+        c.fillStyle='#fff3d5';c.font='bold 14px sans-serif';c.textAlign='center';
+        c.fillText('SALA 0'+(i+1),x+75,60);
+        c.fillStyle='#48646a';c.fillRect(x+155,77,319,91);
+        for(let j=0;j<6;j++)for(let k=0;k<3;k++) {
+            const xx=x+159+j*52,yy=81+k*28;
+            c.fillStyle=['#abc9ca','#8daeb0','#769499'][k];c.fillRect(xx,yy,48,24);
+            c.fillStyle='#cad7c9';c.fillRect(xx,yy,48,3);
+        }
+        c.fillStyle='#c2b391';c.fillRect(x+150,167,328,7);
+    }
+    const wall=prop(new THREE.BoxGeometry(500,67,5),0xffffff,0,34,-237);
+    wall.material.map=new THREE.CanvasTexture(canvas);
+    prop(new THREE.BoxGeometry(506,2,30),0xa58e73,0,1,-224);
+    prop(new THREE.BoxGeometry(510,2.4,46),0xac714d,0,68,-229).rotation.x=.09;
+    prop(new THREE.BoxGeometry(510,1.5,2.5),0x725746,0,65,-206);
+    for(const x of [-246,-165,-80,80,165,246]) {
+        prop(new THREE.BoxGeometry(2.1,65,2.1),0xc7bda2,x,33,-209);
+    }
+    const sign=document.createElement('canvas');sign.width=768;sign.height=96;
+    const g=sign.getContext('2d');g.fillStyle='#27565c';g.fillRect(0,0,768,96);
+    g.fillStyle='#f9e7bc';g.font='bold 53px sans-serif';g.textAlign='center';
+    g.fillText('ESCOLA MUNICIPAL',384,68);
+    const plaque=prop(new THREE.BoxGeometry(101,12.5,1),0xffffff,0,66,-204.3);
+    plaque.material.map=new THREE.CanvasTexture(sign);
+    for(const side of [-1,1]) {
+        prop(new THREE.BoxGeometry(4,34,348),0xd7c6a5,side*245,17,-30);
+        prop(new THREE.BoxGeometry(4.3,12,348),0x507b80,side*245,6,-30);
+        const x=side*205;
+        prop(new THREE.CylinderGeometry(1.8,2.4,26,10),0x7b6451,x,13,-211);
+        for(const [dx,y,r] of [[0,33,11],[-7,30,8],[6,31,8]]) {
+            prop(new THREE.IcosahedronGeometry(r,1),dx===0?0x779362:0x597f61,x+dx,y,-213);
+        }
+        prop(new THREE.BoxGeometry(23,1.6,5),0xa87e5a,side*132,5.3,-214);
+        for(const dx of [-8,8])prop(new THREE.BoxGeometry(2.2,5,4),0x918778,side*132+dx,2.5,-214);
+    }
+}

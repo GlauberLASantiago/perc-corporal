@@ -191,7 +191,8 @@ const BodyMotion = (() => {
 function setupStageSettings(scene, floor, grid, light) {
     const themes = {
         studio: [0x2a1f1a, 0x3d271d], theatre: [0x1d1423, 0x543927],
-        dance: [0x42302b, 0x79674f], park: [0x89979b, 0x666766]
+        dance: [0x42302b, 0x79674f], park: [0x89979b, 0x666766],
+        school: [0x92b4c0, 0x74716b]
     };
     const sets = new Map();
     function scenery(name) {
@@ -212,6 +213,9 @@ function setupStageSettings(scene, floor, grid, light) {
             buildBallroom(prop);
         } else if (name === 'park') {
             buildCityPlaza(prop);
+        } else if (name === 'school') {
+            buildSchoolCourtyard(prop);
+            group.userData.floorMap = schoolCourtFloor();
         }
         if (name === 'dance' || name === 'park') group.userData.floorMap = plazaOrParquet(name === 'park');
         scene.add(group);
@@ -224,8 +228,9 @@ function setupStageSettings(scene, floor, grid, light) {
         sets.get(name).visible = true;
         scene.background.setHex(themes[name][0]);
         scene.fog.color.copy(scene.background);
-        scene.fog.near = name === 'park' || name === 'dance' ? 160 : 100;
-        scene.fog.far = name === 'park' || name === 'dance' ? 560 : 400;
+        const deepSet = ['park','dance','school'].includes(name);
+        scene.fog.near = name === 'school' ? 270 : deepSet ? 160 : 100;
+        scene.fog.far = name === 'school' ? 740 : deepSet ? 560 : 400;
         floor.map = sets.get(name).userData.floorMap || null;
         floor.roughness = name === 'park' ? .95 : name === 'dance' ? .77 : .45;
         floor.metalness = floor.map ? 0 : .1;

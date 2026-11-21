@@ -79,19 +79,33 @@
             pointer-events: none;
         }
 
-        #hint {
+        #stage-tools {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255,255,255,0.9);
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 0.85em;
-            color: #333;
-            pointer-events: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 10;
+            top: max(12px, env(safe-area-inset-top));
+            left: max(12px, env(safe-area-inset-left));
+            display: flex;
+            gap: 6px;
+            z-index: 25;
         }
+        #stage-tools button {
+            display: grid; place-items: center; width: 44px; height: 44px;
+            border: 1px solid #ffffff59; border-radius: 8px; cursor: pointer;
+            background: #152029dd; color: white; font-size: 18px;
+        }
+        #stage-tools button:focus-visible { outline: 3px solid #ffc75c; }
+        #stage-tools #stage-play, #stage-tools .exit-icon { display: none; }
+        body.stage-only > :not(#stage-container) { display: none !important; }
+        body.stage-only #stage-container {
+            position: fixed; inset: 0; width: 100%; height: 100%; min-height: 0;
+        }
+        body.stage-only #stage-container > :not(#stage-tools):not(#canvas3d) { display: none !important; }
+        body.stage-only #stage-tools #stage-play { display: grid; }
+        body.stage-only #stage-tools .enter-icon { display: none; }
+        body.stage-only #stage-tools .exit-icon { display: block; }
+        body.stage-only #stage-container.tools-idle #stage-tools:not(:has(:focus-visible)) {
+            opacity: 0; pointer-events: none;
+        }
+        body.stage-only #stage-container.tools-idle #canvas3d { cursor: none; }
 
         #glossary-panel {
             position: absolute;
@@ -717,9 +731,6 @@
                 left: 46px; 
             }
 
-            #hint { 
-                display: none; 
-            }
             
             #controls {
                 padding: 4px !important;
@@ -919,7 +930,15 @@
 
     <div id="stage-container">
         <div id="app-title">Percorporalizando</div>
-        <div id="hint">🖱️ <b>3D</b></div>
+        <div id="stage-tools">
+            <button id="stage-fullscreen" type="button" title="Palco em tela cheia" aria-label="Palco em tela cheia" aria-pressed="false">
+                <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path class="enter-icon" d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>
+                    <path class="exit-icon" d="M3 9h6V3m6 0v6h6M9 21v-6H3m12 6v-6h6"/>
+                </svg>
+            </button>
+            <button id="stage-play" type="button" title="Reproduzir sequência" aria-label="Reproduzir sequência">▶</button>
+        </div>
         
         <div id="glossary-panel">
             <div style="font-size:0.85em; color:#666; font-weight:bold; text-align:center; margin-bottom: 5px;">SONS (VOZES)</div>
@@ -1040,6 +1059,7 @@
         <select id="stage-setting">
             <option value="studio">Estúdio</option><option value="dance">Salão de baile</option>
             <option value="theatre">Teatro</option><option value="park">Praça</option>
+            <option value="school">Pátio de escola</option>
         </select>
 
         <label class="mix-control"><input type="checkbox" id="mix-class" checked> Misturar avatares</label>
@@ -1896,6 +1916,7 @@ async function togglePlayback() {
     const button = document.getElementById('play-btn');
     if (button.disabled) return;
     button.disabled = true;
+    document.getElementById('stage-play').disabled = true;
     button.textContent = 'Carregando sons…';
     try {
         await Promise.all(Object.values(percussionBanks).map(bank => loadPercussionBank(audioCtx, bank)));
@@ -1905,6 +1926,7 @@ async function togglePlayback() {
         button.textContent = 'Tentar carregar sons';
     } finally {
         button.disabled = false;
+        document.getElementById('stage-play').disabled = false;
     }
 }
 
@@ -1924,6 +1946,7 @@ function startPlayback() {
     nextNoteTime = loopStartTime;
     document.getElementById('play-btn').textContent = '⏹ Stop';
     document.getElementById('play-btn').classList.add('playing');
+    updateStagePlaybackButton();
     scheduler();
 }
 
@@ -1938,6 +1961,7 @@ function stopPlayback() {
     visualQueue = []; 
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
+    updateStagePlaybackButton();
     document.querySelectorAll('.time-cell').forEach(c => c.classList.remove('playing'));
     const isMobile = window.innerWidth <= 768;
     document.getElementById('playhead').style.left = isMobile ? '46px' : '65px'; 
@@ -3131,7 +3155,100 @@ function applyMoveCommand(command) {
 
 // --- 3D ---
 let scene, camera, renderer, controls;
+let moveCameraWithKeys;
 let allAvatars = []; 
+
+function setupCameraKeys(canvas) {
+    const directions = {KeyW:'forward', ArrowUp:'forward', KeyS:'back', ArrowDown:'back',
+        KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right'};
+    const held = new Set();
+    const right = new THREE.Vector3(), forward = new THREE.Vector3(), step = new THREE.Vector3();
+    canvas.tabIndex = 0;
+    canvas.setAttribute('aria-label', 'Palco 3D. Use WASD ou as setas para mover a câmera e arraste para girar.');
+    canvas.addEventListener('pointerdown', () => canvas.focus({preventScroll:true}));
+    document.addEventListener('keydown', event => {
+        if (!directions[event.code] || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.target.isContentEditable || event.target.closest?.('input,select,textarea,[role="slider"]')) return;
+        if (document.querySelector('#custom-prompt-modal') || ['modal-overlay','showcase-overlay'].some(
+            id => document.getElementById(id).getClientRects().length > 0)) return;
+        event.preventDefault();
+        if (event.target.closest?.('#stage-tools')) canvas.focus({preventScroll:true});
+        held.add(event.code);
+    });
+    document.addEventListener('keyup', event => held.delete(event.code));
+    window.addEventListener('blur', () => held.clear());
+    document.addEventListener('visibilitychange', () => held.clear());
+    document.addEventListener('focusin', () => held.clear());
+    return delta => {
+        if (!held.size) return;
+        const x = Number(held.has('KeyD') || held.has('ArrowRight')) - Number(held.has('KeyA') || held.has('ArrowLeft'));
+        const z = Number(held.has('KeyW') || held.has('ArrowUp')) - Number(held.has('KeyS') || held.has('ArrowDown'));
+        right.setFromMatrixColumn(camera.matrixWorld,0);
+        right.y = 0;
+        right.normalize();
+        forward.crossVectors(camera.up,right);
+        step.copy(right).multiplyScalar(x).addScaledVector(forward,z).normalize().multiplyScalar(48*delta);
+        camera.position.add(step);
+        controls.target.add(step);
+    };
+}
+
+function setupStagePresentation() {
+    const stage = document.getElementById('stage-container');
+    const toggle = document.getElementById('stage-fullscreen');
+    const play = document.getElementById('stage-play');
+    const nativeStage = () => document.fullscreenElement || document.webkitFullscreenElement;
+    let idleTimer;
+
+    function revealTools() {
+        if (!document.body.classList.contains('stage-only')) return;
+        stage.classList.remove('tools-idle');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => stage.classList.add('tools-idle'), 2200);
+    }
+    function setPresentation(active) {
+        document.body.classList.toggle('stage-only', active);
+        const label = active ? 'Sair da tela cheia' : 'Palco em tela cheia';
+        toggle.title = label;
+        toggle.setAttribute('aria-label', label);
+        toggle.setAttribute('aria-pressed', String(active));
+        clearTimeout(idleTimer);
+        stage.classList.remove('tools-idle');
+        if (active) revealTools();
+        else toggle.focus({preventScroll:true});
+    }
+    toggle.addEventListener('click', async () => {
+        if (nativeStage() === stage) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            await exit.call(document);
+        } else if (document.body.classList.contains('stage-only')) {
+            setPresentation(false);
+        } else {
+            setPresentation(true);
+            const enter = stage.requestFullscreen || stage.webkitRequestFullscreen;
+            // O modo de palco também funciona em navegadores que só permitem ocupar a janela.
+            try { await enter?.call(stage); } catch { /* A apresentação já ocupa a janela. */ }
+        }
+    });
+    for (const event of ['fullscreenchange', 'webkitfullscreenchange']) {
+        document.addEventListener(event, () => setPresentation(nativeStage() === stage));
+    }
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !nativeStage() && document.body.classList.contains('stage-only')) {
+            event.stopImmediatePropagation();
+            setPresentation(false);
+        }
+    });
+    for (const event of ['pointermove', 'pointerdown', 'focusin']) stage.addEventListener(event, revealTools);
+    play.addEventListener('click', togglePlayback);
+}
+
+function updateStagePlaybackButton() {
+    const play = document.getElementById('stage-play');
+    play.textContent = state.isPlaying ? '■' : '▶';
+    play.title = state.isPlaying ? 'Parar sequência' : 'Reproduzir sequência';
+    play.setAttribute('aria-label', play.title);
+}
 
 function initThreeJS() {
     const container = document.getElementById('canvas3d');
@@ -3150,6 +3267,7 @@ function initThreeJS() {
     container.appendChild(renderer.domElement);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
+    moveCameraWithKeys = setupCameraKeys(renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.target.set(0, 20, 0); 
@@ -3193,11 +3311,13 @@ function initThreeJS() {
 
     loadClassModels().then(initAvatars);
 
-    window.addEventListener('resize', () => {
+    setupStagePresentation();
+    new ResizeObserver(() => {
+        if (!container.clientWidth || !container.clientHeight) return;
         camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
-    });
+    }).observe(container);
 
     animate3D();
 }
@@ -5294,6 +5414,7 @@ function animate3D() {
     const now = performance.now();
     const delta = Math.min(.1, (now - previousPoseTime) / 1000);
     previousPoseTime = now;
+    moveCameraWithKeys(delta);
     controls.update();
 
     if (audioCtx && state.isPlaying) {

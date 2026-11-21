@@ -27,6 +27,8 @@ Uma janela flutuante que desenha em tempo real a partitura rítmica corresponden
 
 ### 3. Palco 3D Interativo e Mostruário de Avatares
 
+O botão de tela cheia no canto do palco abre a apresentação. Mova o ponteiro ou toque no palco para exibir os controles de reprodução e saída. No computador, use **W/S** ou **↑/↓** para avançar e recuar e **A/D** ou **←/→** para deslocar a câmera para os lados. Arraste com o mouse para girar a visão.
+
 A professora guia a turma mista na abertura. No mostruário, qualquer avatar pode assumir a frente. Desmarque **Misturar avatares** para usar o modelo da guia em toda a turma. Alturas e larguras variam entre participantes e se mantêm ao trocar a formação.
 
 A professora e a aluna usam a [base do MakeHuman](https://github.com/makehumancommunity/makehuman) e [trajes e texturas do pacote oficial CC0](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html). O [Robô Expressivo](https://threejs.org/examples/webgl_animation_skinning_morph.html) é de Tomás Laulhé, com modificações de Don McCurdy, distribuído sob CC0. O menino e a capivara são modelos construídos para o aplicativo.
